@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kartu Sementara</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .wrap-lebar { max-width: 900px; }
+  .daftar-siswa { max-height: 380px; overflow-y: auto; border-radius: var(--radius-kecil); box-shadow: var(--neu-inset-sm); }
+  .baris-siswa { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--garis); font-size: 13px; }
+  .baris-siswa:last-child { border-bottom: none; }
+  .baris-siswa .info { flex: 1; }
+  .baris-siswa .kode-txt { font-weight: 700; color: var(--hijau-tua); }
+  .baris-siswa select { font-size: 12px; padding: 3px; }
+  .baris-siswa .aktif-label { font-size: 11px; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .baris-siswa.nonaktif { opacity: 0.5; }
+
+  .tab-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+  .tab-btn {
+    flex: 1; padding: 10px; border-radius: var(--radius-kecil); border: none;
+    background: var(--bg); color: var(--abu); font-size: 13px; font-weight: 600; cursor: pointer;
+    box-shadow: var(--neu-raised-sm);
+  }
+  .tab-btn.aktif { color: var(--hijau-tua); box-shadow: var(--neu-inset-sm), 0 0 0 1.5px rgba(28,122,82,0.3) inset; }
+  .tab-panel { display: none; }
+  .tab-panel.aktif { display: block; }
+
+  .kartu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
+  .kartu {
+    border: 1.5px dashed var(--bg-gelap);
+    border-radius: var(--radius-kecil);
+    padding: 10px 8px;
+    text-align: center;
+    background: var(--bg);
+  }
+  .kartu .label-sekolah { font-size: 9px; letter-spacing: 0.5px; color: var(--abu); text-transform: uppercase; }
+  .kartu .qr-box { display: flex; justify-content: center; margin: 6px 0; }
+  .kartu .nama-siswa { font-weight: 700; font-size: 12px; line-height: 1.2; }
+  .kartu .kode-siswa { font-size: 13px; color: var(--hijau-tua); font-weight: 700; margin-top: 2px; }
+  .kartu .agama-siswa { font-size: 10px; color: var(--abu); margin-top: 2px; }
+
+  @media print {
+    .no-print { display: none !important; }
+    body { background: #fff; }
+    .wrap { max-width: 100%; padding: 0; }
+    .kartu { break-inside: avoid; }
+    .kartu-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap wrap-lebar">
+  <div class="topbar no-print"><span></span><button class="logout-link" onclick="logout()">Keluar</button></div>
+  <header class="top no-print">
+    <div class="badge">🪪</div>
+    <div>
+      <h1>Kartu Sementara</h1>
+      <div class="sub">Kartu kode urut, atau cetak ulang kartu pengganti dari data siswa asli</div>
+    </div>
+  </header>
+
+  <div id="isi">
+    <div class="tab-bar no-print">
+      <button class="tab-btn aktif" data-tab="sementara">🔢 Kartu Sementara (kode urut)</button>
+      <button class="tab-btn" data-tab="siswaAsli">🪪 Cetak dari Data Siswa Asli</button>
+    </div>
+
+    <!-- TAB 1: Kartu Sementara kode urut -->
+    <div class="tab-panel aktif" id="panelSementara">
+      <div class="card no-print">
+        <label for="cariSementara">Cari kode / nama</label>
+        <input id="cariSementara" type="text" placeholder="Ketik untuk filter... (cth: 001 atau SHOLATSNISKI)">
+        <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="btnPilihSemuaSementara" class="secondary">Pilih Semua (hasil filter)</button>
+          <button id="btnKosongkanSementara" class="secondary">Kosongkan Pilihan</button>
+        </div>
+        <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="btnAktifkanSemua" class="secondary">✅ Aktifkan Semua Kartu</button>
+          <button id="btnNonaktifkanSemua" class="secondary">🚫 Nonaktifkan Semua Kartu</button>
+        </div>
+        <div class="daftar-siswa" id="daftarSementara" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="card no-print">
+        <div style="font-weight:700; margin-bottom:6px;">➕ Butuh Lebih dari 700 Kartu?</div>
+        <p class="small-note">Kalau kartu sementara ada yang hilang, atau kuota 700 kurang, bisa nambah kode baru di sini — nomornya otomatis lanjut dari yang terakhir (misal 701, 702, dst), tidak dibatasi 700.</p>
+        <div style="display:flex; gap:8px; align-items:end; margin-top:8px;">
+          <div style="flex:1;">
+            <label for="jumlahTambah">Jumlah kartu baru</label>
+            <input id="jumlahTambah" type="number" value="10" min="1" max="500">
+          </div>
+          <button id="btnTambahKartu">Tambah</button>
+        </div>
+        <div id="pesanTambahKartu" class="small-note"></div>
+      </div>
+    </div>
+
+    <!-- TAB 2: Cetak dari data siswa asli -->
+    <div class="tab-panel" id="panelSiswaAsli">
+      <div class="card no-print">
+        <p class="small-note">Buat kartu kertas berisi barcode NISN asli siswa — berguna kalau KTS asli siswa hilang/rusak dan butuh kartu pengganti sementara sambil menunggu KTS baru.</p>
+        <label for="cariSiswaAsli">Cari nama / kelas / NISN</label>
+        <input id="cariSiswaAsli" type="text" placeholder="Ketik untuk filter...">
+        <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="btnPilihSemuaSiswaAsli" class="secondary">Pilih Semua (hasil filter)</button>
+          <button id="btnKosongkanSiswaAsli" class="secondary">Kosongkan Pilihan</button>
+        </div>
+        <div class="daftar-siswa" id="daftarSiswaAsli" style="margin-top:10px;"></div>
+      </div>
+    </div>
+
+    <div class="card no-print">
+      <div class="small-note" id="jumlahTerpilih">0 kartu dipilih untuk dicetak</div>
+      <div style="margin-top:8px;">
+        <button id="btnBuatKartu">Buat Kartu untuk yang Terpilih</button>
+        <button id="btnCetak" class="secondary" style="margin-left:8px; display:none;">🖨️ Cetak / Simpan sebagai PDF</button>
+      </div>
+      <p class="small-note">Bisa pilih dari kedua tab sekaligus sebelum klik "Buat Kartu" — semua yang dipilih akan tercetak bareng.</p>
+    </div>
+
+    <div class="kartu-grid" id="kartuGrid"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="/common.js"></script>
+<script>
+// ---- Tab switcher ----
+document.querySelectorAll('.tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('aktif'));
+    document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('aktif'));
+    btn.classList.add('aktif');
+    document.getElementById(btn.dataset.tab === 'sementara' ? 'panelSementara' : 'panelSiswaAsli').classList.add('aktif');
+  });
+});
+
+// ---- TAB 1: Kartu Sementara (kode urut) ----
+let semuaKartu = [];
+let terpilihSementara = new Set();
+
+muatKartu();
+async function muatKartu() {
+  const r = await apiGet('/api/sementara');
+  if (r.ok) { semuaKartu = r.data; renderDaftarSementara(); }
+}
+function filterSementara() {
+  const q = document.getElementById('cariSementara').value.trim().toLowerCase();
+  return semuaKartu.filter(s => !q || s.kode.includes(q) || s.nama.toLowerCase().includes(q));
+}
+function renderDaftarSementara() {
+  const list = filterSementara();
+  const el = document.getElementById('daftarSementara');
+  el.innerHTML = '';
+  for (const s of list) {
+    const row = document.createElement('div');
+    row.className = 'baris-siswa' + (s.aktif ? '' : ' nonaktif');
+    row.innerHTML = `
+      <input type="checkbox" class="chk-cetak" data-kode="${s.kode}" ${terpilihSementara.has(s.kode) ? 'checked' : ''}>
+      <div class="info"><span class="kode-txt">${s.kode}</span> — ${s.nama}</div>
+      <select class="agama-sel" data-kode="${s.kode}">
+        <option value="muslim" ${s.agama === 'muslim' ? 'selected' : ''}>Muslim</option>
+        <option value="non_muslim" ${s.agama === 'non_muslim' ? 'selected' : ''}>Non-Muslim</option>
+      </select>
+      <label class="aktif-label"><input type="checkbox" class="chk-aktif" data-kode="${s.kode}" ${s.aktif ? 'checked' : ''}> Aktif</label>
+    `;
+    row.querySelector('.chk-cetak').addEventListener('change', (e) => {
+      if (e.target.checked) terpilihSementara.add(s.kode); else terpilihSementara.delete(s.kode);
+      updateJumlah();
+    });
+    row.querySelector('.agama-sel').addEventListener('change', async (e) => {
+      const r = await apiPost('/api/sementara/agama', { kode: s.kode, agama: e.target.value });
+      if (r.ok) s.agama = e.target.value; else alert(r.pesan);
+    });
+    row.querySelector('.chk-aktif').addEventListener('change', async (e) => {
+      const r = await apiPost('/api/sementara/aktif', { kode: s.kode, aktif: e.target.checked });
+      if (r.ok) { s.aktif = e.target.checked; row.className = 'baris-siswa' + (s.aktif ? '' : ' nonaktif'); }
+      else alert(r.pesan);
+    });
+    el.appendChild(row);
+  }
+  updateJumlah();
+}
+document.getElementById('cariSementara').addEventListener('input', renderDaftarSementara);
+document.getElementById('btnPilihSemuaSementara').addEventListener('click', () => {
+  filterSementara().forEach(s => terpilihSementara.add(s.kode));
+  renderDaftarSementara();
+});
+document.getElementById('btnKosongkanSementara').addEventListener('click', () => { terpilihSementara.clear(); renderDaftarSementara(); });
+
+document.getElementById('btnAktifkanSemua').addEventListener('click', async () => {
+  if (!confirm('Aktifkan SEMUA kartu sementara sekaligus?')) return;
+  const r = await apiPost('/api/sementara/aktif-semua', { aktif: true });
+  if (r.ok) muatKartu(); else alert(r.pesan);
+});
+document.getElementById('btnNonaktifkanSemua').addEventListener('click', async () => {
+  if (!confirm('Nonaktifkan SEMUA kartu sementara sekaligus? Kartu yang sedang dipakai siswa jadi tidak bisa discan lagi.')) return;
+  const r = await apiPost('/api/sementara/aktif-semua', { aktif: false });
+  if (r.ok) muatKartu(); else alert(r.pesan);
+});
+document.getElementById('btnTambahKartu').addEventListener('click', async () => {
+  const jumlah = parseInt(document.getElementById('jumlahTambah').value, 10);
+  if (!jumlah || jumlah < 1) { alert('Isi jumlah yang valid'); return; }
+  const r = await apiPost('/api/sementara/tambah', { jumlah });
+  document.getElementById('pesanTambahKartu').textContent = r.ok ? '✅ ' + r.pesan : '❌ ' + r.pesan;
+  if (r.ok) muatKartu();
+});
+
+// ---- TAB 2: Cetak dari data siswa asli ----
+let semuaSiswaAsli = [];
+let terpilihSiswaAsli = new Set();
+
+muatSiswaAsli();
+async function muatSiswaAsli() {
+  const r = await apiGet('/api/siswa');
+  if (r.ok) { semuaSiswaAsli = r.data; renderDaftarSiswaAsli(); }
+}
+function filterSiswaAsli() {
+  const q = document.getElementById('cariSiswaAsli').value.trim().toLowerCase();
+  return semuaSiswaAsli.filter(s => !q || s.kts_id.toLowerCase().includes(q) || s.nama.toLowerCase().includes(q) || (s.kelas || '').toLowerCase().includes(q));
+}
+function renderDaftarSiswaAsli() {
+  const list = filterSiswaAsli();
+  const el = document.getElementById('daftarSiswaAsli');
+  el.innerHTML = '';
+  for (const s of list) {
+    const row = document.createElement('div');
+    row.className = 'baris-siswa';
+    row.innerHTML = `
+      <input type="checkbox" class="chk-cetak-asli" data-kts="${s.kts_id}" ${terpilihSiswaAsli.has(s.kts_id) ? 'checked' : ''}>
+      <div class="info">${s.nama} <span style="color:var(--abu);">— ${s.kelas || ''}</span><div class="kode-txt" style="font-size:11px;">${s.kts_id}</div></div>
+    `;
+    row.querySelector('.chk-cetak-asli').addEventListener('change', (e) => {
+      if (e.target.checked) terpilihSiswaAsli.add(s.kts_id); else terpilihSiswaAsli.delete(s.kts_id);
+      updateJumlah();
+    });
+    el.appendChild(row);
+  }
+  updateJumlah();
+}
+document.getElementById('cariSiswaAsli').addEventListener('input', renderDaftarSiswaAsli);
+document.getElementById('btnPilihSemuaSiswaAsli').addEventListener('click', () => {
+  filterSiswaAsli().forEach(s => terpilihSiswaAsli.add(s.kts_id));
+  renderDaftarSiswaAsli();
+});
+document.getElementById('btnKosongkanSiswaAsli').addEventListener('click', () => { terpilihSiswaAsli.clear(); renderDaftarSiswaAsli(); });
+
+// ---- Cetak gabungan (dari tab manapun yang dipilih) ----
+function updateJumlah() {
+  const total = terpilihSementara.size + terpilihSiswaAsli.size;
+  document.getElementById('jumlahTerpilih').textContent = `${total} kartu dipilih untuk dicetak`;
+}
+
+document.getElementById('btnBuatKartu').addEventListener('click', () => {
+  const grid = document.getElementById('kartuGrid');
+  grid.innerHTML = '';
+  const dipilihSementara = semuaKartu.filter(s => terpilihSementara.has(s.kode));
+  const dipilihAsli = semuaSiswaAsli.filter(s => terpilihSiswaAsli.has(s.kts_id));
+  if (!dipilihSementara.length && !dipilihAsli.length) { alert('Pilih minimal 1 kartu dulu'); return; }
+
+  for (const s of dipilihSementara) {
+    buatKartuVisual(s.kode, s.nama, s.agama === 'non_muslim' ? 'Non-Muslim' : 'Muslim', 'Kartu Sementara · Absensi Sholat');
+  }
+  for (const s of dipilihAsli) {
+    buatKartuVisual(s.kts_id, s.nama + (s.kelas ? ' · ' + s.kelas : ''), '', 'Kartu Pengganti (dari data asli) · Absensi Sholat');
+  }
+  document.getElementById('btnCetak').style.display = 'inline-block';
+});
+
+function buatKartuVisual(kodeBarcode, labelNama, labelAgama, labelAtas) {
+  const idUnik = 'qr-' + kodeBarcode.replace(/[^a-zA-Z0-9]/g, '');
+  const kartu = document.createElement('div');
+  kartu.className = 'kartu';
+  kartu.innerHTML = `
+    <div class="label-sekolah">${labelAtas}</div>
+    <div class="qr-box" id="${idUnik}"></div>
+    <div class="kode-siswa">${kodeBarcode}</div>
+    <div class="nama-siswa">${labelNama}</div>
+    ${labelAgama ? `<div class="agama-siswa">${labelAgama}</div>` : ''}
+  `;
+  document.getElementById('kartuGrid').appendChild(kartu);
+  new QRCode(document.getElementById(idUnik), {
+    text: kodeBarcode, width: 90, height: 90,
+    colorDark: '#0f4c3a', colorLight: '#ffffff',
+  });
+}
+
+document.getElementById('btnCetak').addEventListener('click', () => window.print());
+</script>
+</body>
+</html>

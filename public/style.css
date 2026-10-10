@@ -1,0 +1,361 @@
+:root {
+  /* ---- Neumorphism: 1 warna dasar, "timbul" & "tenggelam" dibuat dari kombinasi bayangan terang+gelap ---- */
+  --bg: #e6ece8;              /* warna dasar seluruh halaman & permukaan kartu/tombol */
+  --bg-terang: #ffffff;       /* sumber cahaya (bayangan terang, kiri-atas) */
+  --bg-gelap: #b9c6bd;        /* bayangan gelap (kanan-bawah) */
+  --teks: #2c3a33;
+  --abu: #6f7d75;
+  --hijau: #1c7a52;
+  --hijau-tua: #0f4c38;
+  --merah: #c0392b;
+  --kuning: #9c6b08;
+  --putih: #ffffff;
+  --garis: rgba(185, 198, 189, 0.6);
+
+  --radius: 22px;
+  --radius-kecil: 16px;
+
+  --neu-raised: 7px 7px 14px var(--bg-gelap), -7px -7px 14px var(--bg-terang);
+  --neu-raised-sm: 4px 4px 9px var(--bg-gelap), -4px -4px 9px var(--bg-terang);
+  --neu-raised-lg: 10px 10px 22px var(--bg-gelap), -10px -10px 22px var(--bg-terang);
+  --neu-inset: inset 5px 5px 10px var(--bg-gelap), inset -5px -5px 10px var(--bg-terang);
+  --neu-inset-sm: inset 3px 3px 6px var(--bg-gelap), inset -3px -3px 6px var(--bg-terang);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  color: var(--teks);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 100vh;
+}
+
+body {
+  background-color: var(--bg);
+  min-height: 100vh;
+}
+
+.wrap {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+  min-height: 100vh;
+}
+
+header.top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0 22px;
+}
+header.top .badge {
+  width: 46px; height: 46px;
+  border-radius: 16px;
+  background: var(--bg);
+  color: var(--hijau-tua);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 21px;
+  box-shadow: var(--neu-raised-sm);
+}
+header.top h1 {
+  font-size: 17px;
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: -0.2px;
+  color: var(--teks);
+}
+header.top .sub {
+  font-size: 12px;
+  color: var(--abu);
+}
+
+.card {
+  background: var(--bg);
+  border: none;
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--neu-raised);
+  margin-bottom: 16px;
+}
+
+#reader {
+  width: 100%;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+  box-shadow: var(--neu-inset);
+}
+#reader video { border-radius: var(--radius); }
+
+.status-box {
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: 28px 18px;
+  text-align: center;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: box-shadow 0.2s ease, color 0.2s ease;
+  box-shadow: var(--neu-raised);
+  color: var(--abu);
+}
+.status-box.idle { color: var(--abu); }
+.status-box.ok   { color: var(--hijau-tua); box-shadow: var(--neu-raised), 0 0 0 2.5px rgba(28,122,82,0.3) inset; }
+.status-box.deny { color: var(--merah);     box-shadow: var(--neu-raised), 0 0 0 2.5px rgba(192,57,43,0.3) inset; }
+.status-box.warn { color: var(--kuning);    box-shadow: var(--neu-raised), 0 0 0 2.5px rgba(156,107,8,0.3) inset; }
+.status-box.info { color: #2a5c8a;          box-shadow: var(--neu-raised), 0 0 0 2.5px rgba(42,92,138,0.25) inset; }
+
+.flip-cam-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: var(--radius-kecil);
+  border: none;
+  background: var(--bg);
+  color: var(--teks);
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: var(--neu-raised-sm);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.flip-cam-btn:active { box-shadow: var(--neu-inset-sm); transform: scale(0.99); }
+
+.status-box .ikon { font-size: 44px; line-height: 1; }
+.status-box .judul { font-size: 22px; font-weight: 700; }
+.status-box .detail { font-size: 15px; opacity: 0.9; }
+.status-box .waktu { font-size: 12px; opacity: 0.7; }
+
+.stat-row {
+  display: flex;
+  gap: 10px;
+}
+.stat {
+  flex: 1;
+  background: var(--bg);
+  border: none;
+  border-radius: var(--radius);
+  padding: 14px 12px;
+  text-align: center;
+  box-shadow: var(--neu-raised-sm);
+}
+.stat .n { font-size: 24px; font-weight: 800; color: var(--hijau-tua); letter-spacing: -0.5px; }
+.stat .l { font-size: 11px; color: var(--abu); margin-top: 2px; }
+
+.manual {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.manual input { flex: 1; }
+
+button {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  border: none;
+  border-radius: var(--radius-kecil);
+  padding: 12px 18px;
+  background: var(--bg);
+  color: var(--hijau-tua);
+  cursor: pointer;
+  box-shadow: var(--neu-raised-sm);
+  transition: box-shadow 0.12s ease, transform 0.12s ease, opacity 0.12s ease;
+}
+button:active { box-shadow: var(--neu-inset-sm); transform: scale(0.99); }
+button.secondary {
+  background: var(--bg);
+  color: var(--abu);
+  font-weight: 600;
+  border: none;
+  box-shadow: var(--neu-inset-sm);
+}
+button.secondary:active { box-shadow: var(--neu-inset); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.menu-list { display: flex; flex-direction: column; gap: 14px; margin-top: 12px; }
+.menu-item {
+  display: block;
+  background: var(--bg);
+  border: none;
+  border-radius: var(--radius);
+  padding: 18px;
+  text-decoration: none;
+  color: var(--teks);
+  box-shadow: var(--neu-raised);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.menu-item:active { box-shadow: var(--neu-inset); }
+.menu-item .t { font-weight: 700; font-size: 16px; color: var(--hijau-tua); }
+.menu-item .d { font-size: 13px; color: var(--abu); margin-top: 3px; }
+
+textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 12px;
+  border-radius: var(--radius-kecil);
+  border: none;
+  background: var(--bg);
+  box-shadow: var(--neu-inset);
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--teks);
+}
+
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  border-radius: var(--radius-kecil);
+  overflow: hidden;
+  background: var(--bg);
+}
+table thead th {
+  text-align: left;
+  padding: 10px 10px;
+  background: var(--bg);
+  color: var(--abu);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  box-shadow: var(--neu-inset-sm);
+}
+table td {
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--garis);
+  background: var(--bg);
+}
+table tbody tr:last-child td { border-bottom: none; }
+table tr.baris-grup td {
+  font-weight: 800;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--hijau-tua);
+  background: var(--bg);
+  box-shadow: var(--neu-inset-sm);
+  padding: 7px 10px;
+}
+
+.pill { display: inline-block; padding: 4px 11px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--bg); box-shadow: var(--neu-raised-sm); }
+.pill.belum { color: var(--abu); }
+.pill.sudah_sholat { color: var(--hijau-tua); }
+.pill.sudah_pulang { color: #1e4f8a; }
+.pill.izin { color: var(--kuning); }
+
+.small-note { font-size: 12px; color: var(--abu); margin-top: 6px; }
+.small-note a { color: var(--hijau-tua); }
+label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px; margin-top: 10px; color: var(--teks); }
+input[type=text], input[type=password] {
+  width: 100%;
+  padding: 11px;
+  border-radius: var(--radius-kecil);
+  border: none;
+  background: var(--bg);
+  box-shadow: var(--neu-inset-sm);
+  font-size: 14px;
+  color: var(--teks);
+  transition: box-shadow 0.15s ease;
+}
+input[type=text]:focus, input[type=password]:focus, select:focus {
+  outline: none;
+  box-shadow: var(--neu-inset-sm), 0 0 0 2.5px rgba(28, 122, 82, 0.25);
+}
+
+.pass-wrap { position: relative; }
+.pass-wrap input { padding-right: 42px; }
+.pass-wrap .btn-mata {
+  position: absolute;
+  right: 4px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; box-shadow: none;
+  font-size: 17px; padding: 6px 8px; cursor: pointer; color: var(--abu);
+}
+.pass-wrap .btn-mata:active { box-shadow: none; transform: translateY(-50%) scale(0.95); }
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.logout-link {
+  font-size: 12px;
+  color: var(--abu);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  box-shadow: none;
+  cursor: pointer;
+  padding: 6px 0;
+  font-family: inherit;
+}
+.logout-link:active { box-shadow: none; transform: none; }
+
+select {
+  width: 100%;
+  padding: 11px;
+  border-radius: var(--radius-kecil);
+  border: none;
+  background: var(--bg);
+  box-shadow: var(--neu-inset-sm);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--teks);
+}
+
+.user-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 10px;
+  margin-bottom: 8px;
+  border-radius: var(--radius-kecil);
+  box-shadow: var(--neu-raised-sm);
+  font-size: 13px;
+  gap: 8px;
+}
+.user-row .peran { font-size: 11px; color: var(--abu); }
+.user-row button { padding: 6px 10px; font-size: 11px; white-space: nowrap; }
+.jadwal-piket { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.chip-hari {
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--abu);
+  border: none;
+  box-shadow: var(--neu-raised-sm);
+}
+.chip-hari:active { box-shadow: var(--neu-inset-sm); }
+.chip-hari.aktif {
+  color: var(--hijau-tua);
+  box-shadow: var(--neu-inset-sm), 0 0 0 1.5px rgba(28,122,82,0.3) inset;
+}
+
+/* Popup / modal (dipakai peringatan haid) */
+.modal-latar {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(44, 58, 51, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 18px;
+}
+.modal-isi {
+  width: 100%; max-width: 420px; max-height: 92vh; overflow: auto;
+  background: var(--bg); border-radius: var(--radius);
+  padding: 20px; box-shadow: var(--neu-raised-lg);
+}
+input[type=date] {
+  width: 100%; padding: 11px; border-radius: var(--radius-kecil); border: none;
+  background: var(--bg); box-shadow: var(--neu-inset-sm);
+  font-size: 14px; font-family: inherit; color: var(--teks);
+}

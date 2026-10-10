@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Akun Guru & Staff</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .wrap-lebar { max-width: 700px; }
+  .user-row { align-items: flex-start; }
+  .toolbar { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<div class="wrap wrap-lebar">
+  <div class="topbar"><span></span><button class="logout-link" onclick="logout()">Keluar</button></div>
+  <header class="top">
+    <div class="badge">👥</div>
+    <div>
+      <h1>Akun Guru & Staff</h1>
+      <div class="sub">Kelola akun Guru dan Admin</div>
+    </div>
+  </header>
+
+  <div class="card">
+    <div style="font-weight:700; margin-bottom:6px;">Tambah Akun</div>
+    <p class="small-note">
+      <b>Guru</b>: beri/tarik token sholat di gerbang, dan juga bisa pakai mode Scan Khusus (beri token ke siswa berhalangan sakit/haid/izin) — semuanya dari 1 akun yang sama. <b>Admin</b>: akses penuh, bisa lebih dari 1 akun.
+      Klik hari di bawah nama akun Guru untuk atur jadwal piketnya.
+    </p>
+    <label for="fUserNama">Nama Pengguna</label>
+    <input id="fUserNama" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="cth: bu_siti atau pak_ahmad">
+    <label for="fUserPass">Password</label>
+    <div class="pass-wrap"><input id="fUserPass" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="minimal 4 karakter"></div>
+    <label for="fUserRole">Peran</label>
+    <select id="fUserRole">
+      <option value="guru">Guru</option>
+      <option value="admin">Admin</option>
+    </select>
+    <div style="margin-top:10px;"><button id="btnTambahUser">Tambah Akun</button></div>
+    <div id="pesanUser" class="small-note"></div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <label style="font-size:13px; display:flex; align-items:center; gap:6px;"><input type="checkbox" id="pilihSemua"> Pilih semua</label>
+      <button class="secondary" id="btnHapusMassal" style="color:var(--merah);">🗑️ Hapus Terpilih (<span id="jmlTerpilih">0</span>)</button>
+    </div>
+    <div id="daftarUser"></div>
+  </div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+const terpilih = new Set();
+const labelPeran = { admin: 'Admin', guru: 'Guru', scan_khusus: 'Scan Khusus (lama)' };
+const labelHari = { 1: 'Sen', 2: 'Sel', 3: 'Rab', 4: 'Kam', 5: 'Jum', 6: 'Sab', 7: 'Min' };
+
+document.getElementById('btnTambahUser').addEventListener('click', async () => {
+  const username = document.getElementById('fUserNama').value.trim();
+  const password = document.getElementById('fUserPass').value;
+  const role = document.getElementById('fUserRole').value;
+  if (!username || !password) { alert('Nama dan password wajib diisi'); return; }
+  const r = await apiPost('/api/users', { username, password, role });
+  document.getElementById('pesanUser').textContent = r.ok ? '✅ ' + r.pesan : '❌ ' + r.pesan;
+  if (r.ok) {
+    document.getElementById('fUserNama').value = '';
+    document.getElementById('fUserPass').value = '';
+    muatUsers();
+  }
+});
+
+async function muatUsers() {
+  const r = await apiGet('/api/users');
+  if (!r.ok) return;
+  const box = document.getElementById('daftarUser');
+  box.innerHTML = '';
+  for (const u of r.data) {
+    const row = document.createElement('div');
+    row.className = 'user-row';
+    const jadwalAktif = (u.jadwal || '').split(',').filter(Boolean).map(Number);
+    const chipJadwal = u.role === 'guru' ? `
+      <div class="jadwal-piket">
+        <span class="small-note" style="margin:0;">Piket:</span>
+        ${[1, 2, 3, 4, 5, 6, 7].map((h) => `<button type="button" class="chip-hari ${jadwalAktif.includes(h) ? 'aktif' : ''}" data-user-id="${u.id}" data-hari="${h}">${labelHari[h]}</button>`).join('')}
+      </div>` : '';
+    row.innerHTML = `
+      <input type="checkbox" class="chk-user" data-id="${u.id}" style="margin-top:4px;">
+      <div style="flex:1;">
+        <b>${u.username}</b><div class="peran">${labelPeran[u.role] || u.role}</div>
+        ${chipJadwal}
+      </div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="secondary" data-reset-id="${u.id}" data-nama="${u.username}">Reset Password</button>
+        <button class="secondary" data-hapus-id="${u.id}" data-nama="${u.username}" style="color:var(--merah);">Hapus</button>
+      </div>`;
+    box.appendChild(row);
+  }
+  box.querySelectorAll('.chk-user').forEach((c) => {
+    c.addEventListener('change', () => {
+      if (c.checked) terpilih.add(Number(c.dataset.id)); else terpilih.delete(Number(c.dataset.id));
+      document.getElementById('jmlTerpilih').textContent = terpilih.size;
+    });
+  });
+  box.querySelectorAll('button[data-hari]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      btn.classList.toggle('aktif');
+      const userId = Number(btn.dataset.userId);
+      const hariAktif = [...box.querySelectorAll(`button[data-hari][data-user-id="${userId}"].aktif`)].map((b) => Number(b.dataset.hari));
+      const rr = await apiPost('/api/users/jadwal', { id: userId, hari: hariAktif });
+      if (!rr.ok) { alert(rr.pesan); btn.classList.toggle('aktif'); }
+    });
+  });
+  box.querySelectorAll('button[data-hapus-id]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm(`Hapus akun "${btn.dataset.nama}"?`)) return;
+      const r = await apiPost('/api/users/delete', { id: Number(btn.dataset.hapusId) });
+      if (r.ok) muatUsers(); else alert('❌ ' + r.pesan);
+    });
+  });
+  box.querySelectorAll('button[data-reset-id]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const passwordBaru = prompt(`Password baru untuk "${btn.dataset.nama}" (minimal 4 karakter):`);
+      if (!passwordBaru) return;
+      const r = await apiPost('/api/users/password', { id: Number(btn.dataset.resetId), password: passwordBaru });
+      alert(r.ok ? '✅ ' + r.pesan : '❌ ' + r.pesan);
+    });
+  });
+}
+
+document.getElementById('pilihSemua').addEventListener('change', (e) => {
+  document.querySelectorAll('.chk-user').forEach((c) => {
+    c.checked = e.target.checked;
+    if (e.target.checked) terpilih.add(Number(c.dataset.id)); else terpilih.delete(Number(c.dataset.id));
+  });
+  document.getElementById('jmlTerpilih').textContent = terpilih.size;
+});
+
+document.getElementById('btnHapusMassal').addEventListener('click', async () => {
+  if (terpilih.size === 0) { alert('Pilih dulu akun yang mau dihapus'); return; }
+  if (!confirm(`Hapus ${terpilih.size} akun terpilih?`)) return;
+  const r = await apiPost('/api/users/delete-massal', { ids: [...terpilih] });
+  alert(r.ok ? '✅ ' + r.pesan : '❌ ' + r.pesan);
+  terpilih.clear();
+  document.getElementById('jmlTerpilih').textContent = 0;
+  muatUsers();
+});
+
+muatUsers();
+pasangTombolMata();
+</script>
+</body>
+</html>

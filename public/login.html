@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Masuk — Absensi Sholat</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="badge">🕌</div>
+    <div>
+      <h1>Absensi Sholat Sekolah</h1>
+      <div class="sub">Silakan masuk dulu sesuai akun kamu</div>
+    </div>
+  </header>
+
+  <div class="card">
+    <label for="fUsername">Nama Pengguna</label>
+    <input id="fUsername" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Nama pengguna">
+    <label for="fPassword">Password</label>
+    <div class="pass-wrap"><input id="fPassword" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Password"></div>
+    <div style="margin-top:10px;"><button id="btnMasuk">Masuk</button></div>
+    <div id="pesanLogin" class="small-note"></div>
+  </div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+async function login() {
+  const username = document.getElementById('fUsername').value.trim();
+  const password = document.getElementById('fPassword').value;
+  const pesan = document.getElementById('pesanLogin');
+  if (!username || !password) { pesan.textContent = 'Isi nama pengguna dan password dulu'; return; }
+  pesan.textContent = 'Sedang masuk...';
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const r = await res.json();
+    if (r.ok) {
+      // ?next=/halaman -> kembali ke halaman itu setelah login (hanya path internal yang aman)
+      const next = new URLSearchParams(location.search).get('next');
+      const aman = next && /^\/[a-z0-9\-_\/]*$/i.test(next) && !next.startsWith('//');
+      window.location.href = aman ? next : (r.redirect || '/');
+    } else {
+      pesan.textContent = '❌ ' + r.pesan;
+    }
+  } catch (e) {
+    pesan.textContent = '❌ Gagal terhubung ke server';
+  }
+}
+document.getElementById('btnMasuk').addEventListener('click', login);
+document.getElementById('fPassword').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+document.getElementById('fUsername').addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('fPassword').focus(); });
+pasangTombolMata();
+</script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Absensi Sholat Sekolah</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  html, body { height: 100%; }
+  .welcome-wrap {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    /* konten naik dari dasar layar: posisinya di antara tengah dan bawah */
+    padding: 40px 20px 15vh;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    text-align: center;
+  }
+  .welcome-wrap::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(15,76,58,0.15) 0%, rgba(15,36,29,0.78) 100%);
+  }
+  .welcome-isi { position: relative; z-index: 1; width: 100%; max-width: 400px; }
+  .welcome-isi h1 { color: #fff; font-size: 26px; margin: 0 0 6px; letter-spacing: -0.3px; }
+  .welcome-isi .tagline { color: rgba(255,255,255,0.9); font-size: 14px; margin: 0 0 16px; }
+  .tentang {
+    text-align: left;
+    background: rgba(255,255,255,0.12);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 18px;
+    padding: 14px 16px;
+    margin-bottom: 22px;
+    color: rgba(255,255,255,0.92);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .tentang b { color: #fff; display: block; font-size: 12px; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 6px; }
+  .tentang p { margin: 0 0 6px; }
+  .tentang p:last-child { margin-bottom: 0; }
+  .tombol-welcome { display: flex; flex-direction: column; gap: 12px; }
+  .tombol-welcome button {
+    width: 100%;
+    padding: 14px;
+    font-size: 16px;
+  }
+  .tombol-welcome button .sub { display: block; font-size: 11px; font-weight: 500; color: var(--abu); margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="welcome-wrap" id="welcomeWrap">
+  <div class="welcome-isi">
+    <h1>Absensi Sholat Sekolah</h1>
+    <p class="tagline">Sistem absensi sholat digital berbasis kartu pelajar</p>
+
+    <div class="tentang">
+      <b>Tentang sistem ini</b>
+      <p>Kehadiran sholat siswa dicatat lewat scan kartu pelajar. Setelah sholat, siswa mendapat <i>token</i> dari guru piket, lalu token dicek di gerbang sebelum siswa pulang.</p>
+      <p>Siswa yang berhalangan (sakit, haid, izin) tetap tercatat lengkap. Orang tua dan wali kelas dapat melihat riwayat sholat anak kapan saja dan mengunduhnya sebagai PDF atau Excel, termasuk untuk laporan atau nilai rapor.</p>
+    </div>
+
+    <div class="tombol-welcome">
+      <button id="btnGuru">🔐 Masuk Guru / Admin<span class="sub">Beri token, cek gerbang, kelola data</span></button>
+      <button id="btnOrtu">👨‍👩‍👧 Orang Tua / Wali Kelas<span class="sub">Lihat riwayat sholat siswa, unduh PDF / Excel</span></button>
+    </div>
+  </div>
+</div>
+
+<script>
+(async function() {
+  try {
+    const res = await fetch('/api/welcome-bg/status');
+    const r = await res.json();
+    if (r.ok) {
+      const isMobile = window.innerWidth <= 768;
+      const url = isMobile ? (r.mobile || r.desktop) : (r.desktop || r.mobile);
+      if (url) {
+        document.getElementById('welcomeWrap').style.backgroundImage = `url('${url}')`;
+      }
+    }
+  } catch (e) { /* pakai background default kalau gagal ambil status */ }
+})();
+document.getElementById('btnGuru').addEventListener('click', () => { window.location.href = '/login'; });
+document.getElementById('btnOrtu').addEventListener('click', () => { window.location.href = '/orangtua'; });
+</script>
+</body>
+</html>

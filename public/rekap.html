@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rekap Absensi</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .wrap-lebar { max-width: 1000px; }
+  .nav-minggu { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .nav-minggu input[type=date] { padding: 10px; border: none; border-radius: var(--radius-kecil); background: var(--bg); box-shadow: var(--neu-inset-sm); color: var(--teks); font-size: 13px; }
+  .nav-minggu select { width: auto; min-width: 140px; }
+  .judul-minggu { font-weight: 700; font-size: 14px; margin: 10px 0 4px; }
+  table.mingguan th, table.mingguan td { text-align: center; white-space: nowrap; }
+  table.mingguan th:nth-child(2), table.mingguan td:nth-child(2) { text-align: left; }
+  .sel-s { color: var(--hijau-tua); font-weight: 700; }
+  .sel-i { color: var(--kuning); font-weight: 700; }
+  .sel-h { color: #a8325e; font-weight: 700; }
+  .sel-b { color: var(--merah); }
+  .sel-x { color: var(--abu); }
+  .tabel-scroll { overflow: auto; max-height: 520px; }
+</style>
+</head>
+<body>
+<div class="wrap wrap-lebar">
+  <div class="topbar"><a class="logout-link" href="/admin">← Kembali</a><button class="logout-link" onclick="logout()">Keluar</button></div>
+  <header class="top">
+    <div class="badge">🗓️</div>
+    <div>
+      <h1>Rekap Absensi</h1>
+      <div class="sub">Harian, mingguan, atau bulanan — Senin–Sabtu (Minggu libur, tidak dihitung)</div>
+    </div>
+  </header>
+
+  <div class="card">
+    <div class="nav-minggu" style="margin-bottom:8px;">
+      <select id="fMode">
+        <option value="harian">Harian</option>
+        <option value="mingguan" selected>Mingguan</option>
+        <option value="bulanan">Bulanan</option>
+      </select>
+    </div>
+    <div class="nav-minggu">
+      <button class="secondary" id="btnPrev">◀ Sebelumnya</button>
+      <input type="date" id="fTanggal">
+      <button class="secondary" id="btnNext">Berikutnya ▶</button>
+      <button class="secondary" id="btnIni">Hari Ini</button>
+      <select id="fKelas"><option value="">Semua kelas</option></select>
+    </div>
+    <div class="judul-minggu" id="judulMinggu">-</div>
+    <p class="small-note">✓ = sudah sholat · I = izin · H = haid · ✗ = belum sholat · • = tidak ada data hari itu (libur / belum ada yang scan, tidak dihitung). Pilih tanggal mana saja: mode Mingguan membuka minggu yang berisi tanggal itu, mode Bulanan membuka bulannya.</p>
+    <div style="display:flex; gap:8px; margin:10px 0;">
+      <button class="secondary" id="btnPdf" style="flex:1; font-size:13px;">📄 Export PDF</button>
+      <button class="secondary" id="btnExcel" style="flex:1; font-size:13px;">📊 Export Excel</button>
+    </div>
+    <div class="tabel-scroll">
+      <table class="mingguan" id="tabel">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="/common.js"></script>
+<script>
+const NAMA_HARI = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+const BULAN = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const BULAN_PANJANG = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+let dataRekap = null;
+let acuan = lokalHariIni();
+
+function lokalHariIni() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function geser(tgl, hari) {
+  const [y, m, d] = tgl.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + hari)).toISOString().slice(0, 10);
+}
+function geserBulan(tgl, n) {
+  const [y, m] = tgl.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 10);
+}
+function fmtTgl(tgl) { const [y, m, d] = tgl.split('-').map(Number); return `${d} ${BULAN[m - 1]} ${y}`; }
+function fmtPendek(tgl) { const [, m, d] = tgl.split('-').map(Number); return `${d}/${m}`; }
+function namaHari(tgl) { const [y, m, d] = tgl.split('-').map(Number); return NAMA_HARI[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]; }
+function modeSekarang() { return document.getElementById('fMode').value; }
+
+function judulPeriode(r) {
+  if (r.mode === 'harian') return `${namaHari(r.dari)}, ${fmtTgl(r.dari)}`;
+  if (r.mode === 'bulanan') { const [y, m] = r.dari.split('-').map(Number); return `${BULAN_PANJANG[m - 1]} ${y}`; }
+  return `Minggu ${fmtTgl(r.dari)} – ${fmtTgl(r.sampai)}`;
+}
+
+// status satu hari -> { s: simbol, k: kelas css, t: teks buat export }
+function sel(item, hariAktif) {
+  if (item && (item.status === 'sudah_sholat' || item.status === 'sudah_pulang')) return { s: '✓', k: 'sel-s', t: 'Sholat' };
+  if (item && item.status === 'izin' && item.alasan_jenis === 'haid') return { s: 'H', k: 'sel-h', t: 'Haid' };
+  if (item && item.status === 'izin') return { s: 'I', k: 'sel-i', t: item.keterangan ? `Izin (${item.keterangan})` : 'Izin' };
+  if (hariAktif) return { s: '✗', k: 'sel-b', t: 'Belum' };
+  return { s: '•', k: 'sel-x', t: '-' };
+}
+function hitung(r, aktif) {
+  let sholat = 0, izin = 0, haid = 0, belum = 0;
+  r.hari.forEach((it, i) => {
+    const c = sel(it, aktif[i]);
+    if (c.s === '✓') sholat++; else if (c.s === 'I') izin++; else if (c.s === 'H') haid++; else if (c.s === '✗') belum++;
+  });
+  return { sholat, izin, haid, belum };
+}
+
+async function muat() {
+  const mode = modeSekarang();
+  const r = await apiGet(`/api/riwayat/rekap?mode=${mode}&tanggal=${encodeURIComponent(acuan)}`);
+  if (!r.ok) { document.getElementById('judulMinggu').textContent = '❌ ' + r.pesan; return; }
+  dataRekap = r;
+  document.getElementById('fTanggal').value = acuan;
+  document.getElementById('judulMinggu').textContent = judulPeriode(r);
+  const kelasSet = [...new Set(r.data.map((d) => d.kelas || '(tanpa kelas)'))].sort();
+  const pilih = document.getElementById('fKelas');
+  const lama = pilih.value;
+  pilih.innerHTML = '<option value="">Semua kelas</option>' + kelasSet.map((k) => `<option value="${k}">${k}</option>`).join('');
+  pilih.value = kelasSet.includes(lama) ? lama : '';
+  render();
+}
+
+function barisTersaring() {
+  const k = document.getElementById('fKelas').value;
+  return dataRekap.data.filter((d) => !k || (d.kelas || '(tanpa kelas)') === k);
+}
+
+function render() {
+  const r = dataRekap;
+  document.querySelector('#tabel thead').innerHTML =
+    `<tr><th>No</th><th>Nama</th><th>Kelas</th>${r.tanggal.map((t) => `<th>${namaHari(t)}<br><span style="font-weight:400">${fmtPendek(t)}</span></th>`).join('')}<th>Sholat</th><th>Izin</th><th>Haid</th><th>Belum</th></tr>`;
+  const tb = document.querySelector('#tabel tbody');
+  tb.innerHTML = '';
+  barisTersaring().forEach((d, i) => {
+    const h = hitung(d, r.hariAktif);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i + 1}</td><td>${d.nama}</td><td>${d.kelas || ''}</td>` +
+      d.hari.map((it, j) => { const c = sel(it, r.hariAktif[j]); return `<td class="${c.k}" title="${c.t}">${c.s}</td>`; }).join('') +
+      `<td class="sel-s">${h.sholat}</td><td class="sel-i">${h.izin}</td><td class="sel-h">${h.haid}</td><td class="sel-b">${h.belum}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function barisExport() {
+  const r = dataRekap;
+  return barisTersaring().map((d, i) => {
+    const h = hitung(d, r.hariAktif);
+    return [i + 1, d.nama, d.kelas || '', ...d.hari.map((it, j) => sel(it, r.hariAktif[j]).t), h.sholat, h.izin, h.haid, h.belum];
+  });
+}
+function headExport() {
+  return ['No', 'Nama', 'Kelas', ...dataRekap.tanggal.map((t) => `${namaHari(t)} ${fmtPendek(t)}`), 'Sholat', 'Izin', 'Haid', 'Belum'];
+}
+function namaFile(ext) { return `rekap-${dataRekap.mode}-${dataRekap.dari}` + (dataRekap.dari === dataRekap.sampai ? '' : `-sd-${dataRekap.sampai}`) + `.${ext}`; }
+
+document.getElementById('btnPdf').addEventListener('click', () => {
+  if (!dataRekap || dataRekap.data.length === 0) { alert('Belum ada data buat diexport'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt' });
+  doc.setFontSize(14);
+  doc.text(`Rekap Absensi Sholat ${dataRekap.mode.charAt(0).toUpperCase() + dataRekap.mode.slice(1)}`, 40, 38);
+  doc.setFontSize(10);
+  const k = document.getElementById('fKelas').value;
+  doc.text(`${judulPeriode(dataRekap)}${k ? ' · Kelas ' + k : ''}`, 40, 54);
+  doc.autoTable({
+    startY: 66, head: [headExport()], body: barisExport(),
+    styles: { fontSize: dataRekap.tanggal.length > 8 ? 5 : 7, cellPadding: dataRekap.tanggal.length > 8 ? 1.5 : 3 }, headStyles: { fillColor: [15, 76, 56] },
+    columnStyles: { 1: { cellWidth: 130 } },
+  });
+  doc.save(namaFile('pdf'));
+});
+
+document.getElementById('btnExcel').addEventListener('click', () => {
+  if (!dataRekap || dataRekap.data.length === 0) { alert('Belum ada data buat diexport'); return; }
+  const ws = XLSX.utils.aoa_to_sheet([headExport(), ...barisExport()]);
+  ws['!cols'] = [{ wch: 4 }, { wch: 28 }, { wch: 14 }, ...dataRekap.tanggal.map(() => ({ wch: dataRekap.mode === 'harian' ? 22 : 11 })), { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Rekap ' + dataRekap.mode);
+  XLSX.writeFile(wb, namaFile('xlsx'));
+});
+
+document.getElementById('btnPrev').addEventListener('click', () => { acuan = modeSekarang() === 'bulanan' ? geserBulan(acuan, -1) : geser(acuan, modeSekarang() === 'mingguan' ? -7 : -1); muat(); });
+document.getElementById('btnNext').addEventListener('click', () => { acuan = modeSekarang() === 'bulanan' ? geserBulan(acuan, 1) : geser(acuan, modeSekarang() === 'mingguan' ? 7 : 1); muat(); });
+document.getElementById('btnIni').addEventListener('click', () => { acuan = lokalHariIni(); muat(); });
+document.getElementById('fTanggal').addEventListener('change', (e) => { if (e.target.value) { acuan = e.target.value; muat(); } });
+document.getElementById('fMode').addEventListener('change', muat);
+document.getElementById('fKelas').addEventListener('change', render);
+
+muat();
+</script>
+</body>
+</html>

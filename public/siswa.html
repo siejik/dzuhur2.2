@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Siswa</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .wrap-lebar { max-width: 900px; }
+  details.grup-jurusan { margin-bottom: 14px; background: var(--bg); border: none; border-radius: var(--radius); box-shadow: var(--neu-raised); overflow: hidden; }
+  details.grup-jurusan summary { padding: 14px 16px; font-weight: 700; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; color: var(--hijau-tua); }
+  details.grup-jurusan summary::-webkit-details-marker { display: none; }
+  details.grup-kelas { margin: 0 12px 10px; border-radius: var(--radius-kecil); overflow: hidden; box-shadow: var(--neu-inset-sm); }
+  details.grup-kelas summary { padding: 8px 12px; font-size: 13px; font-weight: 600; cursor: pointer; list-style: none; display:flex; justify-content:space-between; }
+  details.grup-kelas summary::-webkit-details-marker { display: none; }
+  .baris-siswa { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--garis); flex-wrap: wrap; }
+  .baris-siswa:last-child { border-bottom: none; }
+  .baris-siswa input[type=text] { padding: 6px 8px; font-size: 12px; }
+  .baris-siswa .f-kts { width: 110px; }
+  .baris-siswa .f-nama { flex: 1; min-width: 120px; }
+  .baris-siswa .f-kelas { width: 90px; }
+  .baris-siswa button { padding: 6px 10px; font-size: 11px; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .toolbar label { margin: 0; font-size: 13px; display:flex; align-items:center; gap:6px; }
+</style>
+</head>
+<body>
+<div class="wrap wrap-lebar">
+  <div class="topbar"><span></span><button class="logout-link" onclick="logout()">Keluar</button></div>
+  <header class="top">
+    <div class="badge">🎓</div>
+    <div>
+      <h1>Data Siswa</h1>
+      <div class="sub">Dikelompokkan per jurusan & kelas — bisa edit, pilih, dan hapus massal</div>
+    </div>
+  </header>
+
+  <div class="card">
+    <div style="font-weight:700; margin-bottom:6px;">Tambah Siswa Manual</div>
+    <label for="fKts">Nomor KTS (barcode) / NISN</label>
+    <input id="fKts" type="text" placeholder="cth: 2026001234">
+    <label for="fNama">Nama</label>
+    <input id="fNama" type="text" placeholder="Nama siswa">
+    <label for="fKelas">Kelas</label>
+    <input id="fKelas" type="text" placeholder="cth: XI IPA 2">
+    <label for="fJk">Jenis Kelamin</label>
+    <select id="fJk"><option value="">(belum diisi)</option><option value="L">Laki-laki</option><option value="P">Perempuan</option></select>
+    <div style="margin-top:10px;"><button id="btnTambah">Simpan Siswa</button></div>
+    <div id="pesanTambah" class="small-note"></div>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:700; margin-bottom:6px;">Import Massal (dari Excel / Sheets / CSV)</div>
+    <p class="small-note">Susun kolom di Excel/Google Sheets: <b>nomor_kts, nama, kelas, jenis_kelamin</b> (kolom ke-4 boleh dikosongkan; isi <b>L</b> atau <b>P</b>, atau Laki-laki/Perempuan). Blok baris datanya, <b>Copy</b>, lalu <b>paste</b> di kotak bawah ini.</p>
+    <textarea id="csvInput" placeholder="2026001001,Ahmad Fauzi,XI IPA 1&#10;2026001002,Siti Aminah,XI IPA 1"></textarea>
+    <div style="margin-top:10px;"><button id="btnImport">Import</button></div>
+    <div id="pesanImport" class="small-note"></div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <label><input type="checkbox" id="pilihSemua"> Pilih semua yang tampil</label>
+      <div style="display:flex; gap:8px;">
+        <input id="fCari" type="text" placeholder="Cari nama..." style="width:160px; padding:8px; border-radius:10px; border:1px solid var(--garis); font-size:13px;">
+        <button class="secondary" id="btnJkP" title="Set jenis kelamin Perempuan untuk siswa terpilih">👩 Set P</button>
+        <button class="secondary" id="btnJkL" title="Set jenis kelamin Laki-laki untuk siswa terpilih">👨 Set L</button>
+        <button class="secondary" id="btnHapusMassal" style="color:var(--merah);">🗑️ Hapus Terpilih (<span id="jmlTerpilih">0</span>)</button>
+      </div>
+    </div>
+    <div class="small-note" id="jmlSiswa" style="margin-top:8px;">Memuat data siswa...</div>
+  </div>
+
+  <div id="daftarGrup"></div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+let semuaSiswa = [];
+const terpilih = new Set();
+
+async function muatSiswa() {
+  const r = await apiGet('/api/siswa-semua');
+  if (!r.ok) { document.getElementById('jmlSiswa').textContent = '❌ ' + r.pesan; return; }
+  semuaSiswa = r.data;
+  render();
+}
+
+function render() {
+  const cari = document.getElementById('fCari').value.trim().toLowerCase();
+  const data = semuaSiswa.filter((s) => !cari || s.nama.toLowerCase().includes(cari) || s.kts_id.includes(cari));
+  const belumJk = semuaSiswa.filter((s) => !s.jenis_kelamin).length;
+  document.getElementById('jmlSiswa').textContent = `${data.length} dari ${semuaSiswa.length} siswa` + (belumJk ? ` · ${belumJk} belum diisi jenis kelaminnya (centang siswa lalu klik Set P / Set L)` : '');
+
+  const perJurusan = {};
+  for (const s of data) {
+    perJurusan[s.jurusan] = perJurusan[s.jurusan] || {};
+    const k = s.kelas || '(tanpa kelas)';
+    perJurusan[s.jurusan][k] = perJurusan[s.jurusan][k] || [];
+    perJurusan[s.jurusan][k].push(s);
+  }
+
+  const box = document.getElementById('daftarGrup');
+  box.innerHTML = '';
+  for (const jurusan of Object.keys(perJurusan).sort()) {
+    const kelasMap = perJurusan[jurusan];
+    let totalJurusan = 0;
+    Object.values(kelasMap).forEach((arr) => totalJurusan += arr.length);
+    const detJ = document.createElement('details');
+    detJ.className = 'grup-jurusan';
+    detJ.open = Object.keys(perJurusan).length <= 3;
+    const sum = document.createElement('summary');
+    sum.innerHTML = `<span>📚 ${jurusan}</span><span class="small-note" style="margin:0;">${totalJurusan} siswa</span>`;
+    detJ.appendChild(sum);
+
+    for (const kelas of Object.keys(kelasMap).sort()) {
+      const siswaKelas = kelasMap[kelas];
+      const detK = document.createElement('details');
+      detK.className = 'grup-kelas';
+      detK.open = true;
+      detK.innerHTML = `<summary><span>${kelas}</span><span>${siswaKelas.length} siswa</span></summary>`;
+      for (const s of siswaKelas) {
+        const row = document.createElement('div');
+        row.className = 'baris-siswa';
+        row.innerHTML = `
+          <input type="checkbox" class="chk-siswa" data-kts="${s.kts_id}" ${terpilih.has(s.kts_id) ? 'checked' : ''}>
+          <input type="text" class="f-kts" value="${s.kts_id}">
+          <input type="text" class="f-nama" value="${s.nama}">
+          <input type="text" class="f-kelas" value="${s.kelas || ''}">
+          <select class="f-jk" style="width:74px; padding:6px; font-size:12px;"><option value="" ${!s.jenis_kelamin ? 'selected' : ''}>JK?</option><option value="L" ${s.jenis_kelamin === 'L' ? 'selected' : ''}>L</option><option value="P" ${s.jenis_kelamin === 'P' ? 'selected' : ''}>P</option></select>
+          <button class="btn-simpan-satu" data-kts-lama="${s.kts_id}">💾 Simpan</button>
+          <button class="secondary btn-hapus-satu" data-kts="${s.kts_id}" data-nama="${s.nama}" style="color:var(--merah);">Hapus</button>
+        `;
+        detK.appendChild(row);
+      }
+      detJ.appendChild(detK);
+    }
+    box.appendChild(detJ);
+  }
+
+  box.querySelectorAll('.chk-siswa').forEach((c) => {
+    c.addEventListener('change', () => {
+      if (c.checked) terpilih.add(c.dataset.kts); else terpilih.delete(c.dataset.kts);
+      updateJmlTerpilih();
+    });
+  });
+  box.querySelectorAll('.btn-simpan-satu').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const row = btn.closest('.baris-siswa');
+      const kts_id_baru = row.querySelector('.f-kts').value.trim();
+      const nama = row.querySelector('.f-nama').value.trim();
+      const kelas = row.querySelector('.f-kelas').value.trim();
+      const jenis_kelamin = row.querySelector('.f-jk').value;
+      const r = await apiPost('/api/siswa/edit', { kts_id_lama: btn.dataset.ktsLama, kts_id_baru, nama, kelas, jenis_kelamin });
+      if (r.ok) muatSiswa(); else alert('❌ ' + r.pesan);
+    });
+  });
+  box.querySelectorAll('.btn-hapus-satu').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm(`Hapus data "${btn.dataset.nama}" secara PERMANEN?`)) return;
+      const r = await apiPost('/api/siswa/delete', { kts_id: btn.dataset.kts });
+      if (r.ok) muatSiswa(); else alert('❌ ' + r.pesan);
+    });
+  });
+  updateJmlTerpilih();
+}
+
+function updateJmlTerpilih() {
+  document.getElementById('jmlTerpilih').textContent = terpilih.size;
+}
+
+document.getElementById('pilihSemua').addEventListener('change', (e) => {
+  document.querySelectorAll('.chk-siswa').forEach((c) => {
+    c.checked = e.target.checked;
+    if (e.target.checked) terpilih.add(c.dataset.kts); else terpilih.delete(c.dataset.kts);
+  });
+  updateJmlTerpilih();
+});
+
+document.getElementById('btnHapusMassal').addEventListener('click', async () => {
+  if (terpilih.size === 0) { alert('Pilih dulu siswa yang mau dihapus'); return; }
+  if (!confirm(`Hapus ${terpilih.size} siswa terpilih secara PERMANEN? Riwayat absensinya juga ikut terhapus.`)) return;
+  const r = await apiPost('/api/siswa/delete-massal', { kts_ids: [...terpilih] });
+  if (r.ok) { terpilih.clear(); muatSiswa(); } else alert('❌ ' + r.pesan);
+});
+
+async function setJkTerpilih(jk) {
+  if (terpilih.size === 0) { alert('Centang dulu siswa yang mau diatur'); return; }
+  const r = await apiPost('/api/siswa/jenis-kelamin', { kts_ids: [...terpilih], jenis_kelamin: jk });
+  if (r.ok) { terpilih.clear(); document.getElementById('pilihSemua').checked = false; muatSiswa(); } else alert('❌ ' + r.pesan);
+}
+document.getElementById('btnJkP').addEventListener('click', () => setJkTerpilih('P'));
+document.getElementById('btnJkL').addEventListener('click', () => setJkTerpilih('L'));
+document.getElementById('fCari').addEventListener('input', render);
+
+document.getElementById('btnTambah').addEventListener('click', async () => {
+  const kts_id = document.getElementById('fKts').value.trim();
+  const nama = document.getElementById('fNama').value.trim();
+  const kelas = document.getElementById('fKelas').value.trim();
+  if (!kts_id || !nama) { alert('Nomor KTS dan nama wajib diisi'); return; }
+  const jenis_kelamin = document.getElementById('fJk').value;
+  const r = await apiPost('/api/siswa', { kts_id, nama, kelas, jenis_kelamin });
+  document.getElementById('pesanTambah').textContent = r.ok ? '✅ Siswa disimpan' : '❌ ' + r.pesan;
+  if (r.ok) {
+    document.getElementById('fKts').value = '';
+    document.getElementById('fNama').value = '';
+    document.getElementById('fKelas').value = '';
+    muatSiswa();
+  }
+});
+
+document.getElementById('btnImport').addEventListener('click', async () => {
+  const csv = document.getElementById('csvInput').value.trim();
+  if (!csv) return;
+  const r = await apiPost('/api/siswa/import', { csv });
+  if (r.ok) {
+    document.getElementById('pesanImport').textContent = `✅ ${r.masuk} siswa berhasil diimport` + (r.gagal.length ? `, ${r.gagal.length} baris gagal` : '');
+    document.getElementById('csvInput').value = '';
+    muatSiswa();
+  } else {
+    document.getElementById('pesanImport').textContent = '❌ ' + r.pesan;
+  }
+});
+
+muatSiswa();
+</script>
+</body>
+</html>

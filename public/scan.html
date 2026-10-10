@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Scan KTS — Absensi Sholat</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar"><span></span><button class="logout-link" onclick="logout()">Keluar</button></div>
+  <header class="top">
+    <div class="badge" id="badge"></div>
+    <div>
+      <h1 id="judul"></h1>
+      <div class="sub" id="sub"></div>
+    </div>
+  </header>
+
+  <div class="stat-row">
+    <button id="btnPemberi" type="button" onclick="setMode('pemberi')">🟢 Pemberi Token</button>
+    <button id="btnPenarik" type="button" onclick="setMode('penarik')">🚪 Penarik Token</button>
+  </div>
+  <div class="stat-row" style="margin-top:8px;">
+    <button id="btnKhusus" type="button" class="secondary" onclick="setMode('khusus')" style="width:100%;">🩺 Scan Khusus (siswa berhalangan: sakit/haid/izin)</button>
+  </div>
+
+  <div id="infoJadwal" class="small-note" style="display:none;"></div>
+
+  <div class="stat-row">
+    <div class="stat"><div class="n" id="stat1">-</div><div class="l" id="label1"></div></div>
+    <div class="stat"><div class="n" id="stat2">-</div><div class="l" id="label2"></div></div>
+  </div>
+
+  <div class="card">
+    <div id="reader"></div>
+  </div>
+
+  <div id="statusBox" class="status-box idle"></div>
+
+  <div class="card">
+    <label for="manualInput">Kalau barcode tidak terbaca, ketik manual nomor KTS:</label>
+    <div class="manual">
+      <input id="manualInput" type="text" inputmode="numeric" placeholder="Nomor KTS">
+      <button id="btnManual">Kirim</button>
+    </div>
+  </div>
+
+  <div class="card" id="panelKhusus" style="display:none;">
+    <div style="font-weight:700; margin-bottom:6px;">Nomor KTS Terbaca: <span id="ktsKhususTampil">-</span></div>
+    <label>Alasan Cepat</label>
+    <div class="stat-row">
+      <button type="button" class="secondary" data-alasan="Sakit" data-jenis="sakit">🤒 Sakit</button>
+      <button type="button" class="secondary" id="btnAlasanHaid" data-alasan="Haid" data-jenis="haid" style="display:none;">🩸 Haid</button>
+      <button type="button" class="secondary" data-alasan="Izin" data-jenis="izin">📄 Izin</button>
+    </div>
+    <div id="infoHaid" class="small-note" style="display:none;"></div>
+    <div id="blokMulaiHaid" style="display:none;">
+      <label for="fMulaiHaid">Sudah haid sejak tanggal (kosongkan kalau baru mulai hari ini)</label>
+      <input id="fMulaiHaid" type="date">
+    </div>
+    <label for="fKeterangan" id="labelKeterangan">Keterangan (bisa diketik/diedit manual)</label>
+    <input id="fKeterangan" type="text" placeholder="cth: Sakit demam, izin orang tua, dll">
+    <div style="margin-top:10px; display:flex; gap:8px;">
+      <button id="btnKirimKhusus" style="flex:1;">Beri Token</button>
+      <button class="secondary" id="btnBatalKhusus">Batal</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-latar" id="modalHaid" style="display:none;">
+  <div class="modal-isi">
+    <div style="font-size:34px; text-align:center;">⚠️</div>
+    <h3 id="mhJudul" style="text-align:center; margin:6px 0 4px;">Haid lebih lama dari biasanya</h3>
+    <div id="mhInfo" class="small-note" style="text-align:center; margin-bottom:8px;"></div>
+    <label for="mhMulai">Haid dimulai sejak (bisa dikoreksi)</label>
+    <input id="mhMulai" type="date">
+    <label for="mhKet">Keterangan guru (wajib)</label>
+    <textarea id="mhKet" style="min-height:70px; font-family:inherit;" placeholder="cth: Sudah ditanya, memang masih haid / perlu dicek UKS"></textarea>
+    <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">
+      <button id="mhLanjut">✅ Lanjut beri token</button>
+      <button id="mhTidak" class="secondary" style="color:var(--merah);">⛔ Tidak beri token (selidiki dulu)</button>
+      <button id="mhBatal" class="secondary">Batal</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="/common.js"></script>
+<script>
+const statusBox = document.getElementById('statusBox');
+let sedangProses = false;
+let mode = 'pemberi';
+
+const $ = (id) => document.getElementById(id);
+const box = (kelas, ikon, judul, detail = '', waktu = '') => {
+  statusBox.className = 'status-box ' + kelas;
+  statusBox.innerHTML = `<div class="ikon">${ikon}</div><div class="judul">${judul}</div>` +
+    (detail ? `<div class="detail">${detail}</div>` : '') + (waktu ? `<div class="waktu">${waktu}</div>` : '');
+};
+
+// ---- Mode PEMBERI: beri token setelah sholat ----
+function hasilPemberi(h) {
+  if (h.info) { box('info', 'ℹ️', h.siswa.nama, h.pesan); beep('ok'); }
+  else if (h.ok && !h.sudahAda) {
+    box('ok', '✅', h.siswa.nama, h.siswa.kelas || '', `${h.diperbarui ? 'Token diperbarui' : 'Token diberikan'} · ${formatWaktu(h.waktu)}`);
+    beep('ok');
+  } else if (h.ok) {
+    box('warn', '⚠️', h.siswa.nama, 'Sudah discan hari ini, tidak perlu discan ulang', `Token diberikan pada: ${formatWaktu(h.waktu)}`);
+    beep('warn');
+  } else { box('deny', '❌', h.pesan); beep('deny'); }
+}
+
+// ---- Mode PENARIK: cek token di gerbang ----
+function hasilPenarik(h) {
+  const siswa = h.siswa ? `${h.siswa.nama} — ${h.siswa.kelas || ''}` : '';
+  if (h.ok && h.izin) { box('ok', '✅', 'BOLEH PULANG (IZIN)', `${siswa} · ${h.keterangan || ''}`, formatWaktu(h.waktu)); beep('ok'); }
+  else if (h.ok) { box('ok', '✅', 'BOLEH PULANG', siswa, formatWaktu(h.waktu)); beep('ok'); }
+  else if (h.code === 'belum_sholat') { box('deny', '⛔', 'BELUM SHOLAT', siswa); beep('deny'); }
+  else if (h.code === 'sudah_keluar') { box('warn', '⚠️', 'SUDAH DISCAN KELUAR HARI INI', siswa, `Discan pada: ${formatWaktu(h.waktu)}`); beep('warn'); }
+  else if (h.code === 'token_kadaluarsa') { box('deny', '⏰', 'TOKEN KADALUARSA', `${h.siswa.nama} — minta token sholat lagi`); beep('deny'); }
+  else { box('deny', '❌', h.pesan); beep('deny'); }
+}
+
+const MODE = {
+  pemberi: {
+    badge: '🟢', judul: 'Beri Token Sholat', sub: 'Scan KTS siswa setelah selesai sholat',
+    api: '/api/token', tampil: hasilPemberi,
+    stat: [['Sudah dapat token', (r) => r.sudahSholat], ['Total siswa terdaftar', (r) => r.totalSiswa]],
+  },
+  penarik: {
+    badge: '🚪', judul: 'Cek Token — Gerbang Keluar', sub: 'Scan KTS sebagai syarat pulang',
+    api: '/api/verify', tampil: hasilPenarik,
+    stat: [['Sudah pulang', (r) => r.sudahPulang], ['Sudah sholat hari ini', (r) => r.sudahSholat]],
+  },
+  khusus: {
+    badge: '🩺', judul: 'Scan Khusus', sub: 'Beri token ke siswa berhalangan (sakit/haid/izin)',
+    api: '/api/token-khusus', tampil: null,
+    stat: [['Token izin hari ini', (r) => r.sudahIzin], ['Total siswa terdaftar', (r) => r.totalSiswa]],
+  },
+};
+
+function setMode(m) {
+  mode = m;
+  localStorage.setItem('modeScan', m);
+  const c = MODE[m];
+  $('badge').textContent = c.badge;
+  $('judul').textContent = c.judul;
+  $('sub').textContent = c.sub;
+  $('label1').textContent = c.stat[0][0];
+  $('label2').textContent = c.stat[1][0];
+  $('btnPemberi').className = m === 'pemberi' ? '' : 'secondary';
+  $('btnPenarik').className = m === 'penarik' ? '' : 'secondary';
+  $('btnKhusus').className = m === 'khusus' ? '' : 'secondary';
+  $('panelKhusus').style.display = 'none';
+  box('idle', '📷', m === 'khusus' ? 'Arahkan kamera ke barcode KTS, atau ketik manual di bawah' : 'Arahkan kamera ke barcode KTS');
+  $('stat1').textContent = $('stat2').textContent = '-';
+  muatRingkasan();
+}
+
+// ---- Scan Khusus: hasil scan/manual cuma MENGISI nomor KTS dulu, belum langsung kirim ----
+// (sengaja — guru wajib pilih alasan/isi keterangan dulu sebelum token izin diberikan)
+let kodeKhususTerakhir = null;
+let jenisDipilih = 'lain';
+const hariIniLokal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+function resetPanelKhusus() {
+  $('panelKhusus').style.display = 'none';
+  $('fKeterangan').value = '';
+  $('fMulaiHaid').value = '';
+  $('blokMulaiHaid').style.display = 'none';
+  $('infoHaid').style.display = 'none';
+  jenisDipilih = 'lain';
+  $('fKeterangan').placeholder = 'cth: Sakit demam, izin orang tua, dll';
+  document.querySelectorAll('#panelKhusus button[data-alasan]').forEach((b) => b.className = 'secondary');
+}
+
+async function terimaKodeKhusus(kode) {
+  if (kode === kodeKhususTerakhir) return; // sudah kebaca barusan, jangan spam
+  kodeKhususTerakhir = kode;
+  setTimeout(() => { kodeKhususTerakhir = null; }, 3000);
+  resetPanelKhusus();
+  const info = await apiGet('/api/haid/info?kts_id=' + encodeURIComponent(kode));
+  if (!info.ok) { box('deny', '❌', info.pesan || 'Kartu tidak terdaftar'); beep('deny'); return; }
+  $('ktsKhususTampil').textContent = `${info.siswa.nama} (${kode})`;
+  $('panelKhusus').dataset.kts = kode;
+  $('panelKhusus').style.display = 'block';
+  // Tombol Haid HANYA muncul untuk siswi (jenis kelamin P) — siswa laki-laki tidak punya pilihan ini
+  $('btnAlasanHaid').style.display = info.boleh_haid ? '' : 'none';
+  if (info.boleh_haid && info.episode) {
+    $('infoHaid').style.display = 'block';
+    $('infoHaid').textContent = `🩸 Sedang tercatat haid: hari ke-${info.episode.hari_ke} (sejak ${formatTanggal(info.episode.mulai)})` + (info.episode.diselidiki ? ' · ditandai untuk diselidiki' : '');
+  } else if (!info.boleh_haid && !info.jenis_kelamin) {
+    $('infoHaid').style.display = 'block';
+    $('infoHaid').textContent = 'ℹ️ Jenis kelamin siswa belum diisi — opsi Haid baru muncul setelah admin mengisinya di Data Siswa.';
+  }
+  box('info', '📇', info.siswa.nama, 'Pilih alasan di bawah, lalu klik "Beri Token"');
+  beep('warn');
+}
+function formatTanggal(t) { const [y, m, d] = t.split('-').map(Number); return `${d}/${m}/${y}`; }
+
+document.querySelectorAll('#panelKhusus button[data-alasan]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#panelKhusus button[data-alasan]').forEach((b) => b.className = 'secondary');
+    btn.className = '';
+    jenisDipilih = btn.dataset.jenis;
+    const haid = jenisDipilih === 'haid';
+    $('blokMulaiHaid').style.display = haid ? 'block' : 'none';
+    $('fMulaiHaid').max = hariIniLokal();
+    // Untuk haid keterangan opsional (sistem otomatis menulis "Haid hari ke-N"); untuk alasan lain wajib
+    $('fKeterangan').value = haid ? '' : btn.dataset.alasan;
+    $('fKeterangan').placeholder = haid ? 'Catatan (opsional)' : 'cth: Sakit demam, izin orang tua, dll';
+  });
+});
+$('btnBatalKhusus').addEventListener('click', () => {
+  resetPanelKhusus();
+  box('idle', '📷', 'Arahkan kamera ke barcode KTS, atau ketik manual di bawah');
+});
+
+function tampilkanHasilKhusus(r) {
+  if (r.ok && r.ditahan) { box('warn', '⛔', 'TOKEN TIDAK DIBERIKAN', `${r.siswa.nama} — ditandai untuk diselidiki`); beep('deny'); }
+  else if (r.ok) { box('ok', '✅', r.siswa.nama, `${r.siswa.kelas || ''} · ${r.keterangan}`, formatWaktu(r.waktu)); beep('ok'); }
+  else { box('deny', '❌', r.pesan); beep('deny'); }
+}
+
+let payloadTertunda = null;
+function bukaModalHaid(r, payload) {
+  payloadTertunda = payload;
+  $('mhJudul').textContent = `Haid sudah hari ke-${r.hari_ke}`;
+  let info = `${r.siswa.nama} · lebih dari ${r.batas} hari (lebih lama dari biasanya)`;
+  if (r.siklus) info += `\nSiklus sebelumnya: H1 ${formatTanggal(r.siklus.mulai_sebelumnya)} → H1 ini = ${r.siklus.hari} hari`;
+  if (r.diselidiki) info += '\nSebelumnya ditandai untuk diselidiki';
+  $('mhInfo').style.whiteSpace = 'pre-line';
+  $('mhInfo').textContent = info;
+  $('mhMulai').value = r.mulai;
+  $('mhMulai').max = hariIniLokal();
+  $('mhKet').value = '';
+  $('modalHaid').style.display = 'flex';
+}
+async function kirimKeputusan(aksi) {
+  const keterangan = $('mhKet').value.trim();
+  if (!keterangan) { alert('Isi keterangan dulu'); return; }
+  const payload = { ...payloadTertunda, konfirmasi: aksi, keterangan, mulai_sejak: $('mhMulai').value || payloadTertunda.mulai_sejak };
+  $('modalHaid').style.display = 'none';
+  try { tampilkanHasilKhusus(await apiPost('/api/token-khusus', payload)); }
+  catch (e) { box('deny', '❌', 'Gagal terhubung ke server'); }
+  resetPanelKhusus();
+  muatRingkasan();
+}
+$('mhLanjut').addEventListener('click', () => kirimKeputusan('lanjut'));
+$('mhTidak').addEventListener('click', () => kirimKeputusan('tidak'));
+$('mhBatal').addEventListener('click', () => { $('modalHaid').style.display = 'none'; });
+
+$('btnKirimKhusus').addEventListener('click', async () => {
+  const kts_id = $('panelKhusus').dataset.kts;
+  const keterangan = $('fKeterangan').value.trim();
+  if (jenisDipilih !== 'haid' && !keterangan) { alert('Isi keterangan alasan dulu'); return; }
+  const payload = { kts_id, keterangan, jenis: jenisDipilih };
+  if (jenisDipilih === 'haid' && $('fMulaiHaid').value) payload.mulai_sejak = $('fMulaiHaid').value;
+  try {
+    const r = await apiPost('/api/token-khusus', payload);
+    if (r.code === 'peringatan_haid') { bukaModalHaid(r, payload); beep('warn'); return; } // popup: guru putuskan lanjut / tidak
+    tampilkanHasilKhusus(r);
+  } catch (e) { box('deny', '❌', 'Gagal terhubung ke server'); }
+  resetPanelKhusus();
+  muatRingkasan();
+});
+
+async function prosesKode(kts_id) {
+  if (mode === 'khusus') { terimaKodeKhusus(kts_id); return; }
+  if (sedangProses) return;
+  sedangProses = true;
+  const c = MODE[mode]; // mode dikunci saat scan, kalau tombol diganti di tengah proses hasilnya tetap benar
+  try {
+    const h = await apiPost(c.api, { kts_id });
+    if (h.code === 'bukan_jadwal') box('deny', '🚫', 'Bukan Jadwal Piket Kamu', h.pesan);
+    else c.tampil(h);
+  } catch (e) {
+    box('deny', '❌', 'Gagal terhubung ke server');
+  }
+  muatRingkasan();
+  setTimeout(() => { sedangProses = false; }, 1500);
+}
+
+const namaHari = { 1: 'Senin', 2: 'Selasa', 3: 'Rabu', 4: 'Kamis', 5: 'Jumat', 6: 'Sabtu', 7: 'Minggu' };
+async function muatInfoJadwal() {
+  try {
+    const r = await apiGet('/api/jadwal-saya');
+    if (!r.ok || r.hari.length === 0) return; // belum diatur admin = tidak ada info yang perlu ditampilkan
+    const kotak = $('infoJadwal');
+    kotak.style.display = 'block';
+    const hariTeks = r.hari.map((h) => namaHari[h]).join(', ');
+    if (r.hari.includes(r.hariIni)) {
+      kotak.textContent = `Jadwal piketmu: ${hariTeks} — hari ini kamu bertugas.`;
+    } else {
+      kotak.textContent = `⚠️ Jadwal piketmu: ${hariTeks} — hari ini (${namaHari[r.hariIni]}) bukan jadwalmu, scan akan ditolak sistem.`;
+    }
+  } catch (e) {}
+}
+
+async function muatRingkasan() {
+  try {
+    const r = await apiGet('/api/ringkasan');
+    if (r.ok) {
+      $('stat1').textContent = MODE[mode].stat[0][1](r);
+      $('stat2').textContent = MODE[mode].stat[1][1](r);
+    }
+  } catch (e) {}
+}
+setInterval(muatRingkasan, 2000); // auto-refresh tiap 2 detik
+
+$('btnManual').addEventListener('click', () => {
+  const v = $('manualInput').value.trim();
+  if (v) { prosesKode(v); $('manualInput').value = ''; }
+});
+$('manualInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $('btnManual').click();
+});
+
+// Urutan mode awal: ?mode= di link → pilihan terakhir di HP ini → pemberi
+const awal = new URLSearchParams(location.search).get('mode') || localStorage.getItem('modeScan');
+setMode(MODE[awal] ? awal : 'pemberi');
+muatInfoJadwal();
+muatAudioKustom();
+initScanner(prosesKode, statusBox);
+</script>
+</body>
+</html>

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Riwayat Sholat Siswa</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .wrap-lebar { max-width: 760px; }
+  .tab-bar { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tab-btn { flex: 1; font-size: 13px; }
+  .tab-btn.aktif { color: var(--hijau-tua); box-shadow: var(--neu-inset-sm), 0 0 0 1.5px rgba(28,122,82,0.3) inset; }
+  .tab-btn:not(.aktif) { color: var(--abu); }
+  .panel { display: none; }
+  .panel.aktif { display: block; }
+  .baris-periode { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+  .baris-periode > div { flex: 1; min-width: 130px; }
+  .cepat { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .cepat button { font-size: 12px; padding: 7px 11px; }
+  .tabel-scroll { overflow: auto; max-height: 460px; margin-top: 10px; }
+  .sel-s { color: var(--hijau-tua); font-weight: 700; }
+  .sel-i { color: var(--kuning); font-weight: 700; }
+  .sel-b { color: var(--merah); font-weight: 700; }
+  tr.klik { cursor: pointer; }
+  tr.klik:active td { box-shadow: var(--neu-inset-sm); }
+  .kotak-info { text-align: center; padding: 18px 10px; color: var(--abu); font-size: 13px; }
+  h2.nama-siswa { margin: 0; font-size: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap wrap-lebar">
+  <div class="topbar"><a class="logout-link" href="/">← Beranda</a><span></span></div>
+  <header class="top">
+    <div class="badge">👨‍👩‍👧</div>
+    <div>
+      <h1>Riwayat Sholat Siswa</h1>
+      <div class="sub">Untuk orang tua, murid, dan wali kelas — bisa diunduh PDF / Excel</div>
+    </div>
+  </header>
+
+  <div class="tab-bar">
+    <button class="tab-btn aktif" id="tabOrtu" type="button">👨‍👩‍👧 Orang Tua / Murid</button>
+    <button class="tab-btn" id="tabWalas" type="button">🏫 Wali Kelas</button>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:700; margin-bottom:6px;">Periode</div>
+    <div class="baris-periode">
+      <div><label for="fDari" style="margin-top:0;">Dari tanggal</label><input type="date" id="fDari"></div>
+      <div><label for="fSampai" style="margin-top:0;">Sampai tanggal</label><input type="date" id="fSampai"></div>
+    </div>
+    <div class="cepat">
+      <button type="button" class="secondary" data-p="bulan-ini">Bulan ini</button>
+      <button type="button" class="secondary" data-p="bulan-lalu">Bulan lalu</button>
+      <button type="button" class="secondary" data-p="3-bulan">3 bulan terakhir</button>
+    </div>
+  </div>
+
+  <!-- ===== Orang tua / murid ===== -->
+  <div class="panel aktif" id="panelOrtu">
+    <div class="card">
+      <label for="fNisn" style="margin-top:0;">NISN / Nomor Kartu Siswa</label>
+      <div class="manual">
+        <input id="fNisn" type="text" inputmode="numeric" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Masukkan NISN anak">
+        <button id="btnCari">Lihat</button>
+      </div>
+      <div id="pesanCari" class="small-note"></div>
+    </div>
+  </div>
+
+  <!-- ===== Wali kelas ===== -->
+  <div class="panel" id="panelWalas">
+    <div class="card" id="kartuLoginWalas" style="display:none;">
+      <div style="font-weight:700;">🔒 Khusus Guru / Wali Kelas</div>
+      <p class="small-note">Rekap satu kelas hanya bisa dibuka setelah login dengan akun guru, supaya data siswa tidak terbuka untuk umum.</p>
+      <button id="btnLoginWalas" type="button" style="margin-top:6px;">Login Guru</button>
+    </div>
+    <div class="card" id="kartuPilihKelas" style="display:none;">
+      <label for="fKelas" style="margin-top:0;">Pilih Kelas</label>
+      <div class="manual"><select id="fKelas"></select><button id="btnKelas">Tampilkan</button></div>
+    </div>
+    <div class="card" id="hasilKelas" style="display:none;">
+      <div style="font-weight:700;" id="judulKelas">-</div>
+      <p class="small-note" id="infoKelas"></p>
+      <div style="display:flex; gap:8px; margin:10px 0;">
+        <button class="secondary" id="btnPdfKelas" style="flex:1; font-size:13px;">📄 Export PDF</button>
+        <button class="secondary" id="btnExcelKelas" style="flex:1; font-size:13px;">📊 Export Excel</button>
+      </div>
+      <div class="tabel-scroll">
+        <table id="tabelKelas">
+          <thead><tr><th>No</th><th>Nama</th><th>Sholat</th><th>Izin</th><th>Belum</th><th>%</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="small-note">Klik nama siswa untuk melihat rincian per tanggal.</p>
+    </div>
+  </div>
+
+  <!-- ===== Detail 1 siswa (dipakai kedua tab) ===== -->
+  <div class="card" id="hasilSiswa" style="display:none;">
+    <h2 class="nama-siswa" id="dNama">-</h2>
+    <div class="small-note" id="dMeta"></div>
+    <div class="stat-row" style="margin-top:12px;">
+      <div class="stat"><div class="n" id="dSholat">-</div><div class="l">Sholat</div></div>
+      <div class="stat"><div class="n" id="dIzin">-</div><div class="l">Izin</div></div>
+      <div class="stat"><div class="n" id="dBelum">-</div><div class="l">Belum</div></div>
+      <div class="stat"><div class="n" id="dPersen">-</div><div class="l">Kehadiran</div></div>
+    </div>
+    <p class="small-note">Kehadiran = Sholat ÷ (Sholat + Belum). Izin tidak dihitung sebagai hadir maupun bolos. Hari Minggu libur; hari yang tidak ada catatan sama sekali di sekolah (libur / belum ada yang scan) tidak dihitung.</p>
+    <div style="display:flex; gap:8px; margin:10px 0;">
+      <button class="secondary" id="btnPdfSiswa" style="flex:1; font-size:13px;">📄 Export PDF</button>
+      <button class="secondary" id="btnExcelSiswa" style="flex:1; font-size:13px;">📊 Export Excel</button>
+    </div>
+    <div class="tabel-scroll">
+      <table id="tabelSiswa">
+        <thead><tr><th>No</th><th>Tanggal</th><th>Hari</th><th>Status</th><th>Waktu Token</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const BULAN = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const LABEL = { sholat: 'Sholat', izin: 'Izin', belum: 'Belum' };
+let detailTerakhir = null;
+let kelasTerakhir = null;
+let walasSiap = false;
+
+// ---------- tanggal ----------
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const fmtTgl = (t) => { const [y, m, d] = t.split('-').map(Number); return `${d} ${BULAN[m - 1]} ${y}`; };
+const fmtJam = (w) => (w && w.split(' ')[1] ? w.split(' ')[1].slice(0, 5) : '-');
+function setPeriode(jenis) {
+  const n = new Date();
+  let dari, sampai = iso(n);
+  if (jenis === 'bulan-ini') dari = iso(new Date(n.getFullYear(), n.getMonth(), 1));
+  else if (jenis === 'bulan-lalu') { dari = iso(new Date(n.getFullYear(), n.getMonth() - 1, 1)); sampai = iso(new Date(n.getFullYear(), n.getMonth(), 0)); }
+  else { dari = iso(new Date(n.getFullYear(), n.getMonth() - 2, 1)); }
+  $('fDari').value = dari; $('fSampai').value = sampai;
+}
+document.querySelectorAll('.cepat button').forEach((b) => b.addEventListener('click', () => setPeriode(b.dataset.p)));
+setPeriode('bulan-ini');
+const qPeriode = () => `dari=${$('fDari').value}&sampai=${$('fSampai').value}`;
+
+// ---------- tab ----------
+function pilihTab(walas) {
+  $('tabOrtu').classList.toggle('aktif', !walas);
+  $('tabWalas').classList.toggle('aktif', walas);
+  $('panelOrtu').classList.toggle('aktif', !walas);
+  $('panelWalas').classList.toggle('aktif', walas);
+  $('hasilSiswa').style.display = 'none';
+  if (walas) cekWalas();
+}
+$('tabOrtu').addEventListener('click', () => pilihTab(false));
+$('tabWalas').addEventListener('click', () => pilihTab(true));
+
+// ---------- detail 1 siswa ----------
+function tampilkanSiswa(r) {
+  detailTerakhir = r;
+  $('hasilSiswa').style.display = 'block';
+  $('dNama').textContent = r.siswa.nama;
+  $('dMeta').textContent = `Kelas ${r.siswa.kelas || '-'} · ${fmtTgl(r.dari)} – ${fmtTgl(r.sampai)}`;
+  const tb = $('tabelSiswa').querySelector('tbody');
+  tb.innerHTML = '';
+  if (r.non_muslim) {
+    ['dSholat', 'dIzin', 'dBelum', 'dPersen'].forEach((id) => { $(id).textContent = '-'; });
+    tb.innerHTML = '<tr><td colspan="5" class="kotak-info">Siswa ini non-muslim, tidak ada kewajiban absensi sholat.</td></tr>';
+  } else {
+    $('dSholat').textContent = r.ringkas.sholat;
+    $('dIzin').textContent = r.ringkas.izin;
+    $('dBelum').textContent = r.ringkas.belum;
+    $('dPersen').textContent = r.ringkas.persen === null ? '-' : r.ringkas.persen + '%';
+    const hari = r.hari.filter((h) => h.status !== 'libur');
+    if (!hari.length) tb.innerHTML = '<tr><td colspan="5" class="kotak-info">Belum ada data pada periode ini.</td></tr>';
+    hari.forEach((h, i) => {
+      const tr = document.createElement('tr');
+      const kls = h.status === 'sholat' ? 'sel-s' : h.status === 'izin' ? 'sel-i' : 'sel-b';
+      tr.innerHTML = `<td>${i + 1}</td><td>${fmtTgl(h.tanggal)}</td><td>${h.hari}</td><td class="${kls}">${LABEL[h.status]}</td><td>${fmtJam(h.waktu)}</td>`;
+      tb.appendChild(tr);
+    });
+  }
+  $('hasilSiswa').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ---------- orang tua / murid (publik, pakai NISN) ----------
+async function cariSiswa() {
+  const nisn = $('fNisn').value.trim();
+  if (!nisn) { $('pesanCari').textContent = 'Isi NISN dulu.'; return; }
+  $('pesanCari').textContent = 'Mencari...';
+  try {
+    const res = await fetch(`/api/publik/riwayat?nisn=${encodeURIComponent(nisn)}&${qPeriode()}`);
+    const r = await res.json();
+    if (!r.ok) { $('pesanCari').textContent = '❌ ' + r.pesan; $('hasilSiswa').style.display = 'none'; return; }
+    $('pesanCari').textContent = '';
+    tampilkanSiswa(r);
+  } catch (e) { $('pesanCari').textContent = '❌ Gagal terhubung ke server'; }
+}
+$('btnCari').addEventListener('click', cariSiswa);
+$('fNisn').addEventListener('keydown', (e) => { if (e.key === 'Enter') cariSiswa(); });
+
+// ---------- wali kelas (butuh login guru) ----------
+async function cekWalas() {
+  if (walasSiap) return;
+  const res = await fetch('/api/walas/kelas');
+  if (res.status === 401) { $('kartuLoginWalas').style.display = 'block'; $('kartuPilihKelas').style.display = 'none'; return; }
+  const r = await res.json();
+  if (!r.ok) return;
+  walasSiap = true;
+  $('kartuLoginWalas').style.display = 'none';
+  $('kartuPilihKelas').style.display = 'block';
+  $('fKelas').innerHTML = r.data.map((k) => `<option value="${k}">${k}</option>`).join('');
+}
+$('btnLoginWalas').addEventListener('click', () => { window.location.href = '/login?next=/orangtua'; });
+
+async function tampilkanKelas() {
+  const kelas = $('fKelas').value;
+  if (!kelas) return;
+  const res = await fetch(`/api/walas/rekap?kelas=${encodeURIComponent(kelas)}&${qPeriode()}`);
+  if (res.status === 401) { walasSiap = false; cekWalas(); return; }
+  const r = await res.json();
+  if (!r.ok) { alert(r.pesan); return; }
+  kelasTerakhir = r;
+  $('hasilKelas').style.display = 'block';
+  $('judulKelas').textContent = `Kelas ${r.kelas}`;
+  $('infoKelas').textContent = `${fmtTgl(r.dari)} – ${fmtTgl(r.sampai)} · ${r.hariAktif} hari sekolah tercatat`;
+  const tb = $('tabelKelas').querySelector('tbody');
+  tb.innerHTML = '';
+  r.data.forEach((s, i) => {
+    const tr = document.createElement('tr');
+    tr.className = 'klik';
+    tr.innerHTML = s.non_muslim
+      ? `<td>${i + 1}</td><td>${s.nama}</td><td colspan="4" style="color:var(--abu)">Non-muslim</td>`
+      : `<td>${i + 1}</td><td>${s.nama}</td><td class="sel-s">${s.sholat}</td><td class="sel-i">${s.izin}</td><td class="sel-b">${s.belum}</td><td>${s.persen === null ? '-' : s.persen + '%'}</td>`;
+    tr.addEventListener('click', async () => {
+      const rr = await (await fetch(`/api/walas/siswa?kts_id=${encodeURIComponent(s.kts_id)}&${qPeriode()}`)).json();
+      if (rr.ok) tampilkanSiswa(rr);
+    });
+    tb.appendChild(tr);
+  });
+}
+$('btnKelas').addEventListener('click', tampilkanKelas);
+
+// ---------- export ----------
+const aman = (t) => String(t).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+function barisSiswa(r) {
+  return r.hari.filter((h) => h.status !== 'libur').map((h, i) => [i + 1, fmtTgl(h.tanggal), h.hari, LABEL[h.status], fmtJam(h.waktu)]);
+}
+function ringkasTeks(r) {
+  return r.non_muslim ? 'Siswa non-muslim (tidak ada kewajiban absensi sholat)'
+    : `Sholat ${r.ringkas.sholat} · Izin ${r.ringkas.izin} · Belum ${r.ringkas.belum} · Kehadiran ${r.ringkas.persen === null ? '-' : r.ringkas.persen + '%'}`;
+}
+$('btnPdfSiswa').addEventListener('click', () => {
+  const r = detailTerakhir; if (!r) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt' });
+  doc.setFontSize(15); doc.text('Riwayat Sholat Siswa', 40, 44);
+  doc.setFontSize(10);
+  doc.text(`Nama   : ${r.siswa.nama}`, 40, 64);
+  doc.text(`Kelas   : ${r.siswa.kelas || '-'}`, 40, 78);
+  doc.text(`Periode : ${fmtTgl(r.dari)} – ${fmtTgl(r.sampai)}`, 40, 92);
+  doc.text(ringkasTeks(r), 40, 106);
+  doc.autoTable({ startY: 120, head: [['No', 'Tanggal', 'Hari', 'Status', 'Waktu Token']], body: barisSiswa(r), styles: { fontSize: 8 }, headStyles: { fillColor: [15, 76, 56] } });
+  doc.save(`riwayat-sholat-${aman(r.siswa.nama)}-${r.dari}-sd-${r.sampai}.pdf`);
+});
+$('btnExcelSiswa').addEventListener('click', () => {
+  const r = detailTerakhir; if (!r) return;
+  const aoa = [['Riwayat Sholat Siswa'], ['Nama', r.siswa.nama], ['Kelas', r.siswa.kelas || '-'], ['Periode', `${fmtTgl(r.dari)} – ${fmtTgl(r.sampai)}`], ['Ringkasan', ringkasTeks(r)], [],
+    ['No', 'Tanggal', 'Hari', 'Status', 'Waktu Token'], ...barisSiswa(r)];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 10 }, { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 12 }];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Riwayat Sholat');
+  XLSX.writeFile(wb, `riwayat-sholat-${aman(r.siswa.nama)}-${r.dari}-sd-${r.sampai}.xlsx`);
+});
+function barisKelas(r) {
+  return r.data.map((s, i) => s.non_muslim ? [i + 1, s.nama, 'Non-muslim', '', '', ''] : [i + 1, s.nama, s.sholat, s.izin, s.belum, s.persen === null ? '-' : s.persen + '%']);
+}
+$('btnPdfKelas').addEventListener('click', () => {
+  const r = kelasTerakhir; if (!r) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt' });
+  doc.setFontSize(15); doc.text(`Rekap Sholat Kelas ${r.kelas}`, 40, 44);
+  doc.setFontSize(10);
+  doc.text(`${fmtTgl(r.dari)} – ${fmtTgl(r.sampai)} · ${r.hariAktif} hari sekolah tercatat`, 40, 62);
+  doc.text('Kehadiran = Sholat ÷ (Sholat + Belum); izin tidak dihitung.', 40, 76);
+  doc.autoTable({ startY: 90, head: [['No', 'Nama', 'Sholat', 'Izin', 'Belum', 'Kehadiran']], body: barisKelas(r), styles: { fontSize: 8 }, headStyles: { fillColor: [15, 76, 56] } });
+  doc.save(`rekap-sholat-${aman(r.kelas)}-${r.dari}-sd-${r.sampai}.pdf`);
+});
+$('btnExcelKelas').addEventListener('click', () => {
+  const r = kelasTerakhir; if (!r) return;
+  const aoa = [[`Rekap Sholat Kelas ${r.kelas}`], ['Periode', `${fmtTgl(r.dari)} – ${fmtTgl(r.sampai)}`], ['Hari sekolah tercatat', r.hariAktif], [],
+    ['No', 'Nama', 'Sholat', 'Izin', 'Belum', 'Kehadiran'], ...barisKelas(r)];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 20 }, { wch: 30 }, { wch: 9 }, { wch: 7 }, { wch: 8 }, { wch: 11 }];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Rekap Kelas');
+  XLSX.writeFile(wb, `rekap-sholat-${aman(r.kelas)}-${r.dari}-sd-${r.sampai}.xlsx`);
+});
+
+// kalau datang dari login (?next=/orangtua) dan sudah login, langsung buka tab wali kelas
+if (document.referrer.includes('/login')) pilihTab(true);
+</script>
+</body>
+</html>

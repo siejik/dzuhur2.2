@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Riwayat Sholat</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .wrap-lebar { max-width: 900px; }
+  .filter-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .filter-row > div { flex: 1; min-width: 130px; }
+  .baris-riwayat { border-bottom: 1px solid var(--garis); }
+  .baris-riwayat:last-child { border-bottom: none; }
+  .detail-tanggal {
+    display: none;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 8px 10px;
+    background: #faf9f4;
+    border-radius: var(--radius-kecil);
+    margin: 6px 0 10px;
+    font-size: 12px;
+  }
+  .detail-tanggal.terbuka { display: block; }
+  .detail-tanggal .baris { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--garis); }
+  .detail-tanggal .baris:last-child { border-bottom: none; }
+  .print-only { display: none; }
+  @media print {
+    .no-print { display: none !important; }
+    .print-only { display: block; }
+    table.tabel-cetak { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.tabel-cetak th, table.tabel-cetak td { border: 1px solid #ccc; padding: 5px 7px; text-align: left; }
+    table.tabel-cetak th { background: #eee; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap wrap-lebar">
+  <div class="topbar no-print"><span></span><button class="logout-link" onclick="logout()">Keluar</button></div>
+  <header class="top no-print">
+    <div class="badge">📅</div>
+    <div>
+      <h1>Riwayat Sholat</h1>
+      <div class="sub">Histori kehadiran sholat, dikelompokkan per kelas & jurusan</div>
+    </div>
+  </header>
+
+  <div class="print-only">
+    <h2 style="margin:0 0 2px;">Riwayat Sholat</h2>
+    <div id="infoCetak" style="font-size:12px; color:#555; margin-bottom:10px;"></div>
+  </div>
+
+  <div class="card no-print">
+    <label for="fDari">Dari Tanggal</label>
+    <input id="fDari" type="date">
+    <label for="fSampai">Sampai Tanggal</label>
+    <input id="fSampai" type="date">
+    <div style="margin-top:10px;"><button id="btnTerapkan">Terapkan Rentang Tanggal</button></div>
+    <div class="small-note" id="infoRentang"></div>
+  </div>
+
+  <div class="card no-print">
+    <div class="filter-row">
+      <div>
+        <label for="fJurusan">Jurusan</label>
+        <select id="fJurusan"><option value="">Semua Jurusan</option></select>
+      </div>
+      <div>
+        <label for="fKelas">Kelas</label>
+        <select id="fKelas"><option value="">Semua Kelas</option></select>
+      </div>
+    </div>
+    <label for="fCari">Cari nama</label>
+    <input id="fCari" type="text" placeholder="Ketik nama siswa...">
+    <div style="margin-top:10px;"><button id="btnExportPdf" class="secondary">📄 Ekspor PDF</button></div>
+  </div>
+
+  <div class="card no-print" id="hasilCard">
+    <div class="small-note" id="jumlahHasil">Memuat data...</div>
+    <div id="daftarHasil" style="margin-top:8px;"></div>
+  </div>
+
+  <table class="tabel-cetak print-only" id="tabelCetak">
+    <thead>
+      <tr><th>No</th><th>Nama</th><th>Kelas</th><th>Jurusan</th><th>Hari Sholat</th><th>Total Hari</th><th>%</th></tr>
+    </thead>
+    <tbody id="tabelCetakBody"></tbody>
+  </table>
+</div>
+
+<script src="/common.js"></script>
+<script>
+let semuaData = [];
+let totalHariAktif = 0;
+let dariSaatIni = '';
+let sampaiSaatIni = '';
+
+function formatTanggalPendek(iso) {
+  const bulanNama = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${d} ${bulanNama[m - 1]} ${y}`;
+}
+function namaHariDariTanggal(iso) {
+  const hariNama = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const [y, m, d] = iso.split('-').map(Number);
+  return hariNama[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+}
+
+// Default rentang tanggal: 6 bulan terakhir s/d hari ini
+(function setDefaultTanggal() {
+  const hariIni = new Date();
+  const enamBulanLalu = new Date();
+  enamBulanLalu.setMonth(enamBulanLalu.getMonth() - 6);
+  document.getElementById('fSampai').value = hariIni.toISOString().slice(0, 10);
+  document.getElementById('fDari').value = enamBulanLalu.toISOString().slice(0, 10);
+})();
+
+async function muatRiwayat() {
+  const dari = document.getElementById('fDari').value;
+  const sampai = document.getElementById('fSampai').value;
+  document.getElementById('jumlahHasil').textContent = 'Memuat data...';
+  const r = await apiGet(`/api/riwayat?dari=${dari}&sampai=${sampai}`);
+  if (!r.ok) { document.getElementById('jumlahHasil').textContent = '❌ ' + (r.pesan || 'Gagal memuat'); return; }
+  semuaData = r.data;
+  totalHariAktif = r.totalHariAktif;
+  dariSaatIni = r.dari;
+  sampaiSaatIni = r.sampai;
+  document.getElementById('infoRentang').textContent = `Menampilkan data ${formatTanggalPendek(r.dari)} — ${formatTanggalPendek(r.sampai)} (${totalHariAktif} hari sekolah aktif tercatat)`;
+  isiDropdownJurusan();
+  isiDropdownKelas();
+  renderHasil();
+}
+
+function isiDropdownJurusan() {
+  const sel = document.getElementById('fJurusan');
+  const nilaiLama = sel.value;
+  const jurusanUnik = [...new Set(semuaData.map((d) => d.jurusan))].sort();
+  sel.innerHTML = '<option value="">Semua Jurusan</option>' + jurusanUnik.map((j) => `<option value="${j}">${j}</option>`).join('');
+  sel.value = nilaiLama;
+}
+function isiDropdownKelas() {
+  const jurusanTerpilih = document.getElementById('fJurusan').value;
+  const sel = document.getElementById('fKelas');
+  const nilaiLama = sel.value;
+  const relevan = jurusanTerpilih ? semuaData.filter((d) => d.jurusan === jurusanTerpilih) : semuaData;
+  const kelasUnik = [...new Set(relevan.map((d) => d.kelas || '(tanpa kelas)'))].sort();
+  sel.innerHTML = '<option value="">Semua Kelas</option>' + kelasUnik.map((k) => `<option value="${k}">${k}</option>`).join('');
+  sel.value = nilaiLama;
+}
+
+function renderHasil() {
+  const jurusan = document.getElementById('fJurusan').value;
+  const kelas = document.getElementById('fKelas').value;
+  const cari = document.getElementById('fCari').value.trim().toLowerCase();
+
+  const hasil = semuaData.filter((d) => {
+    if (jurusan && d.jurusan !== jurusan) return false;
+    if (kelas && (d.kelas || '(tanpa kelas)') !== kelas) return false;
+    if (cari && !d.nama.toLowerCase().includes(cari)) return false;
+    return true;
+  });
+
+  document.getElementById('jumlahHasil').textContent = `${hasil.length} siswa ditemukan`;
+  isiTabelCetak(hasil);
+  const box = document.getElementById('daftarHasil');
+  box.innerHTML = '';
+
+  for (const s of hasil) {
+    const row = document.createElement('div');
+    row.className = 'baris-riwayat';
+    const persen = totalHariAktif > 0 ? Math.round((s.hari_sholat / totalHariAktif) * 100) : 0;
+    row.innerHTML = `
+      <div class="user-row">
+        <div>
+          <b>${s.nama}</b>
+          <div class="peran">${s.kelas || '-'} · ${s.jurusan}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-weight:700; color:var(--hijau-tua);">${s.hari_sholat} / ${totalHariAktif} hari (${persen}%)</div>
+          <button class="secondary btn-detail" data-kts="${s.kts_id}" data-nama="${s.nama}" style="margin-top:4px;">Lihat Detail</button>
+        </div>
+      </div>
+      <div class="detail-tanggal" id="detail-${s.kts_id}"></div>
+    `;
+    box.appendChild(row);
+  }
+
+  box.querySelectorAll('.btn-detail').forEach((btn) => {
+    btn.addEventListener('click', () => bukaDetail(btn.dataset.kts, btn.dataset.nama));
+  });
+}
+
+async function bukaDetail(kts_id, nama) {
+  const panel = document.getElementById(`detail-${kts_id}`);
+  const sedangTerbuka = panel.classList.contains('terbuka');
+  if (sedangTerbuka) { panel.classList.remove('terbuka'); return; }
+
+  panel.innerHTML = 'Memuat riwayat...';
+  panel.classList.add('terbuka');
+  const r = await apiGet(`/api/riwayat/detail?kts_id=${encodeURIComponent(kts_id)}&dari=${dariSaatIni}&sampai=${sampaiSaatIni}`);
+  if (!r.ok) { panel.innerHTML = '❌ ' + (r.pesan || 'Gagal memuat detail'); return; }
+  if (!r.data.length) { panel.innerHTML = 'Belum ada hari sekolah aktif dalam rentang ini.'; return; }
+  panel.innerHTML = r.data.map((d) => `
+    <div class="baris">
+      <span>${formatTanggalPendek(d.tanggal)} (${namaHariDariTanggal(d.tanggal)})</span>
+      <span>${d.sholat ? '✅ Sholat' : '❌ Tidak Sholat'}</span>
+    </div>
+  `).join('');
+}
+
+function isiTabelCetak(hasil) {
+  document.getElementById('infoCetak').textContent =
+    `Rentang: ${formatTanggalPendek(dariSaatIni)} — ${formatTanggalPendek(sampaiSaatIni)} · ${totalHariAktif} hari sekolah aktif · Dicetak: ${new Date().toLocaleDateString('id-ID')}`;
+  const body = document.getElementById('tabelCetakBody');
+  body.innerHTML = hasil.map((s, i) => {
+    const persen = totalHariAktif > 0 ? Math.round((s.hari_sholat / totalHariAktif) * 100) : 0;
+    return `<tr><td>${i + 1}</td><td>${s.nama}</td><td>${s.kelas || '-'}</td><td>${s.jurusan}</td><td>${s.hari_sholat}</td><td>${totalHariAktif}</td><td>${persen}%</td></tr>`;
+  }).join('');
+}
+
+document.getElementById('btnExportPdf').addEventListener('click', () => window.print());
+
+document.getElementById('btnTerapkan').addEventListener('click', muatRiwayat);
+document.getElementById('fJurusan').addEventListener('change', () => { isiDropdownKelas(); renderHasil(); });
+document.getElementById('fKelas').addEventListener('change', renderHasil);
+document.getElementById('fCari').addEventListener('input', renderHasil);
+
+muatRiwayat();
+</script>
+</body>
+</html>

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Admin Absensi Sholat</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar"><span></span><button class="logout-link" onclick="logout()">Keluar</button></div>
+  <header class="top">
+    <div class="badge">⚙️</div>
+    <div>
+      <h1>Admin</h1>
+      <div class="sub">Kelola data siswa & rekap harian</div>
+    </div>
+  </header>
+
+  <div id="isiAdmin">
+
+    <a class="menu-item" href="/siswa" style="margin-bottom:16px;">
+      <div class="t">🎓 Data Siswa</div>
+      <div class="d">Kelola nama, kelas, NISN — dikelompokkan per jurusan & kelas, bisa hapus massal</div>
+    </a>
+
+    <a class="menu-item" href="/akun-guru" style="margin-bottom:16px;">
+      <div class="t">👥 Akun Guru & Staff</div>
+      <div class="d">Tambah/hapus akun Guru (termasuk mode Scan Khusus) & Admin — ganti password, atur jadwal piket</div>
+    </a>
+
+    <a class="menu-item" href="/rekap" style="margin-bottom:16px;">
+      <div class="t">🗓️ Rekap Absensi</div>
+      <div class="d">Pilih lingkup harian / mingguan / bulanan (Senin–Sabtu, Minggu libur), export PDF & Excel</div>
+    </a>
+
+    <a class="menu-item" href="/cetak-kartu" style="margin-bottom:16px;">
+      <div class="t">🪪 Kartu Sementara</div>
+      <div class="d">700 kode (001–700) siap pakai, buat siswa yang belum punya KTS asli</div>
+    </a>
+
+    <a class="menu-item" href="/riwayat" style="margin-bottom:16px;">
+      <div class="t">📅 Riwayat Sholat</div>
+      <div class="d">Histori 6 bulan, dikelompokkan otomatis per kelas & jurusan</div>
+    </a>
+
+    <div class="card">
+      <div style="font-weight:700; margin-bottom:6px;">🖼️ Background Halaman Welcome</div>
+      <p class="small-note">Gambar yang muncul di halaman paling depan sebelum login. Bisa beda antara tampilan HP dan komputer.</p>
+
+      <div class="bg-jenis" data-jenis="desktop" style="margin-top:12px;">
+        <div style="font-weight:600; font-size:13px;">🖥️ Versi Komputer/Desktop</div>
+        <div class="bg-status small-note">Memuat...</div>
+        <div class="bg-preview"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
+          <input type="file" accept="image/*" class="bg-file-input" style="flex:1; min-width:140px; font-size:12px;">
+          <button class="secondary bg-upload-btn" style="font-size:12px;">Upload</button>
+        </div>
+        <button class="secondary bg-hapus-btn" style="font-size:12px; display:none; margin-top:6px;">Kembalikan ke Default</button>
+      </div>
+
+      <div class="bg-jenis" data-jenis="mobile" style="margin-top:16px; padding-top:16px; border-top:1px solid var(--garis);">
+        <div style="font-weight:600; font-size:13px;">📱 Versi HP/Mobile</div>
+        <div class="bg-status small-note">Memuat...</div>
+        <div class="bg-preview"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
+          <input type="file" accept="image/*" class="bg-file-input" style="flex:1; min-width:140px; font-size:12px;">
+          <button class="secondary bg-upload-btn" style="font-size:12px;">Upload</button>
+        </div>
+        <button class="secondary bg-hapus-btn" style="font-size:12px; display:none; margin-top:6px;">Kembalikan ke Default</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-weight:700; margin-bottom:6px;">🔊 Notifikasi Suara Kustom</div>
+      <p class="small-note">Ganti bunyi default ("ceting"/"tetot") dengan rekaman suara sendiri — misalnya suara guru bilang "berhasil" atau "gagal". Bisa upload file yang sudah ada, atau rekam langsung dari sini (butuh izin mikrofon).</p>
+
+      <div class="audio-jenis" data-jenis="sukses" style="margin-top:12px;">
+        <div style="font-weight:600; font-size:13px;">✅ Suara "Berhasil" (dipakai untuk hasil sukses/peringatan)</div>
+        <div class="audio-status small-note">Memuat...</div>
+        <div class="audio-player"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
+          <input type="file" accept="audio/*" class="audio-file-input" style="flex:1; min-width:140px; font-size:12px;">
+          <button class="secondary audio-upload-btn" style="font-size:12px;">Upload</button>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:6px;">
+          <button class="secondary audio-record-btn" style="font-size:12px;">🎙️ Rekam Langsung</button>
+          <button class="secondary audio-hapus-btn" style="font-size:12px; display:none;">Kembalikan ke Default</button>
+        </div>
+      </div>
+
+      <div class="audio-jenis" data-jenis="gagal" style="margin-top:16px; padding-top:16px; border-top:1px solid var(--garis);">
+        <div style="font-weight:600; font-size:13px;">❌ Suara "Gagal"</div>
+        <div class="audio-status small-note">Memuat...</div>
+        <div class="audio-player"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
+          <input type="file" accept="audio/*" class="audio-file-input" style="flex:1; min-width:140px; font-size:12px;">
+          <button class="secondary audio-upload-btn" style="font-size:12px;">Upload</button>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:6px;">
+          <button class="secondary audio-record-btn" style="font-size:12px;">🎙️ Rekam Langsung</button>
+          <button class="secondary audio-hapus-btn" style="font-size:12px; display:none;">Kembalikan ke Default</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-weight:700; margin-bottom:6px;">🔁 Reset Status (khusus testing)</div>
+      <p class="small-note">Hapus status hari ini untuk 1 kartu, supaya bisa dites ulang dari awal (beri token → gerbang) tanpa nunggu ganti hari.</p>
+      <label for="fResetKts">Nomor KTS</label>
+      <input id="fResetKts" type="text" placeholder="cth: 0082320072">
+      <div style="margin-top:10px;"><button id="btnReset" class="secondary">Reset Kartu Ini</button></div>
+      <div id="pesanReset" class="small-note"></div>
+    </div>
+
+    <div class="card" id="kartuHaid" style="display:none;">
+      <div style="font-weight:700; margin-bottom:4px;">🩸 Haid Berjalan <span class="small-note" id="jmlHaid"></span></div>
+      <p class="small-note" style="margin-top:0;">Siswi yang tercatat sedang haid dan belum kembali sholat normal. Yang lewat batas hari atau ditandai "diselidiki" muncul paling atas.</p>
+      <div id="daftarHaid"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:8px;">
+        <div style="font-weight:700;">Rekap Absensi Hari Ini</div>
+        <button class="secondary" id="btnRefresh" style="padding:6px 10px; font-size:13px;">Muat Ulang</button>
+      </div>
+      <div class="stat-row" style="margin-bottom:10px;">
+        <div class="stat"><div class="n" id="rTotal">-</div><div class="l">Total siswa</div></div>
+        <div class="stat"><div class="n" id="rSholat">-</div><div class="l">Sudah sholat</div></div>
+        <div class="stat"><div class="n" id="rPulang">-</div><div class="l">Sudah pulang</div></div>
+      </div>
+      <p class="small-note">Untuk edit nama/kelas/NISN atau hapus data siswa permanen, buka halaman <a href="/siswa">Data Siswa</a>. Tabel di bawah disusun per status (Sudah Pulang → Sudah Sholat → Izin → Belum Sholat) — siap dicetak untuk kebutuhan absensi resmi.</p>
+      <div style="display:flex; gap:8px; margin:10px 0;">
+        <button class="secondary" id="btnExportPdf" style="flex:1; font-size:13px;">📄 Export PDF</button>
+        <button class="secondary" id="btnExportExcel" style="flex:1; font-size:13px;">📊 Export Excel</button>
+      </div>
+      <div style="max-height:420px; overflow:auto;">
+        <table id="tabelRekap">
+          <thead><tr><th>No</th><th>Nama</th><th>Kelas</th><th>Agama</th><th>Status</th><th>Waktu</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="/common.js"></script>
+<script>
+let dataRekapTerakhir = [];
+const labelStatus = { sudah_pulang: 'Sudah Pulang', sudah_sholat: 'Sudah Sholat', izin: 'Izin', belum: 'Belum Sholat' };
+const urutanGrup = ['sudah_pulang', 'sudah_sholat', 'izin', 'belum'];
+
+muatHaid();
+setInterval(muatHaid, 30000);
+async function muatHaid() {
+  const r = await apiGet('/api/haid/berjalan');
+  if (!r.ok) return;
+  const kartu = document.getElementById('kartuHaid');
+  kartu.style.display = r.data.length ? 'block' : 'none';
+  document.getElementById('jmlHaid').textContent = `(${r.data.length} siswi)`;
+  const urut = [...r.data].sort((a, b) => (Number(b.diselidiki) - Number(a.diselidiki)) || (b.hari_ke - a.hari_ke));
+  const box = document.getElementById('daftarHaid');
+  box.innerHTML = '';
+  for (const e of urut) {
+    const lewat = e.hari_ke > r.batas;
+    const barisCatatan = (e.catatan || '').trim().split('\n').filter(Boolean);
+    const terakhir = barisCatatan.length ? barisCatatan[barisCatatan.length - 1] : '';
+    const div = document.createElement('div');
+    div.className = 'user-row';
+    div.style.alignItems = 'flex-start';
+    div.innerHTML = `<div style="flex:1;"><b>${e.nama}</b> <span class="small-note" style="margin:0;">${e.kelas || ''}</span>
+      <div class="small-note" style="margin-top:2px;">Hari ke-${e.hari_ke} · sejak ${e.tanggal_mulai}</div>
+      ${terakhir ? `<div class="small-note" style="margin-top:2px;">📝 ${terakhir}</div>` : ''}</div>
+      <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+        ${lewat ? '<span class="pill izin">⚠️ lewat batas</span>' : ''}
+        ${e.diselidiki ? '<span class="pill belum">🔎 diselidiki</span>' : ''}
+      </div>`;
+    box.appendChild(div);
+  }
+}
+
+muatRekap();
+setInterval(muatRekap, 2000); // auto-refresh tiap 2 detik, cocok buat dipasang di layar monitor standby
+
+document.getElementById('btnRefresh').addEventListener('click', muatRekap);
+
+document.getElementById('btnReset').addEventListener('click', async () => {
+  const kts_id = document.getElementById('fResetKts').value.trim();
+  if (!kts_id) { alert('Isi nomor KTS dulu'); return; }
+  const r = await apiPost('/api/siswa/reset', { kts_id });
+  document.getElementById('pesanReset').textContent = r.ok ? '✅ ' + r.pesan : '❌ ' + r.pesan;
+  if (r.ok) { document.getElementById('fResetKts').value = ''; muatRekap(); }
+});
+
+async function muatRekap() {
+  // Jangan timpa tabel kalau admin lagi fokus di salah satu dropdown agama (biar gak keganggu pas lagi milih)
+  if (document.activeElement && document.activeElement.classList.contains('agama-select')) return;
+  const r = await apiGet('/api/rekap');
+  if (!r.ok) return;
+  const data = r.data;
+  dataRekapTerakhir = data;
+  document.getElementById('rTotal').textContent = data.length;
+  document.getElementById('rSholat').textContent = data.filter(d => d.status === 'sudah_sholat' || d.status === 'sudah_pulang').length;
+  document.getElementById('rPulang').textContent = data.filter(d => d.status === 'sudah_pulang').length;
+
+  const tbody = document.querySelector('#tabelRekap tbody');
+  tbody.innerHTML = '';
+  let no = 1;
+  for (const kelompok of urutanGrup) {
+    const baris = data.filter((d) => (d.status || 'belum') === kelompok);
+    if (baris.length === 0) continue;
+    const trGrup = document.createElement('tr');
+    trGrup.className = 'baris-grup';
+    trGrup.innerHTML = `<td colspan="6">${labelStatus[kelompok]} (${baris.length})</td>`;
+    tbody.appendChild(trGrup);
+    for (const d of baris) {
+      const status = d.status || 'belum';
+      const agama = d.agama || 'muslim';
+      const waktu = d.waktu_keluar || d.waktu_token || '';
+      const haid = status === 'izin' && d.alasan_jenis === 'haid';
+      const catatan = haid ? '' : (status === 'izin' && d.keterangan ? ` — ${d.keterangan}` : '');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${no++}</td><td>${d.nama}</td><td>${d.kelas || ''}</td>
+        <td><select class="agama-select" data-kts="${d.kts_id}" style="font-size:12px; padding:3px;">
+          <option value="muslim" ${agama === 'muslim' ? 'selected' : ''}>Muslim</option>
+          <option value="non_muslim" ${agama === 'non_muslim' ? 'selected' : ''}>Non-Muslim</option>
+        </select></td>
+        <td><span class="pill ${status}">${haid ? 'Haid' : labelStatus[status]}${catatan}</span></td>
+        <td style="font-size:11px; color:var(--abu);">${formatWaktu(waktu)}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+  tbody.querySelectorAll('.agama-select').forEach((sel) => {
+    sel.addEventListener('change', async () => {
+      const r = await apiPost('/api/siswa/agama', { kts_id: sel.dataset.kts, agama: sel.value });
+      if (!r.ok) alert(r.pesan);
+    });
+  });
+}
+
+// ---- Export: susun ulang data (dikelompokkan sama seperti tabel di layar) jadi baris rata buat PDF/Excel ----
+function susunBarisExport() {
+  const baris = [];
+  let no = 1;
+  for (const kelompok of urutanGrup) {
+    const grup = dataRekapTerakhir.filter((d) => (d.status || 'belum') === kelompok);
+    for (const d of grup) {
+      const status = d.status || 'belum';
+      const waktu = d.waktu_keluar || d.waktu_token || '';
+      const haid = status === 'izin' && d.alasan_jenis === 'haid';
+      const ket = status === 'izin' && !haid ? (d.keterangan || '') : '';
+      baris.push([no++, todayStrLokal(), d.nama, d.kelas || '', (d.agama || 'muslim') === 'muslim' ? 'Muslim' : 'Non-Muslim', haid ? 'Haid' : labelStatus[status], waktu ? formatWaktu(waktu) : '-', ket]);
+    }
+  }
+  return baris;
+}
+
+document.getElementById('btnExportPdf').addEventListener('click', () => {
+  if (dataRekapTerakhir.length === 0) { alert('Belum ada data buat diexport'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt' });
+  const tanggal = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  doc.setFontSize(14);
+  doc.text('Rekap Absensi Sholat', 40, 40);
+  doc.setFontSize(10);
+  doc.text(tanggal, 40, 56);
+  doc.autoTable({
+    startY: 70,
+    head: [['No', 'Tanggal', 'Nama', 'Kelas', 'Agama', 'Status', 'Waktu', 'Keterangan']],
+    body: susunBarisExport(),
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [15, 76, 56] },
+  });
+  doc.save(`rekap-absensi-sholat-${todayStrLokal()}.pdf`);
+});
+
+document.getElementById('btnExportExcel').addEventListener('click', () => {
+  if (dataRekapTerakhir.length === 0) { alert('Belum ada data buat diexport'); return; }
+  const header = ['No', 'Tanggal', 'Nama', 'Kelas', 'Agama', 'Status', 'Waktu', 'Keterangan'];
+  const ws = XLSX.utils.aoa_to_sheet([header, ...susunBarisExport()]);
+  ws['!cols'] = [{ wch: 4 }, { wch: 12 }, { wch: 28 }, { wch: 14 }, { wch: 11 }, { wch: 14 }, { wch: 10 }, { wch: 22 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Rekap Absensi');
+  XLSX.writeFile(wb, `rekap-absensi-sholat-${todayStrLokal()}.xlsx`);
+});
+
+function todayStrLokal() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+async function muatStatusAudioAdmin() {
+  const r = await apiGet('/api/audio/status');
+  if (!r.ok) return;
+  renderAudioJenis('sukses', r.sukses);
+  renderAudioJenis('gagal', r.gagal);
+}
+function renderAudioJenis(jenis, url) {
+  const box = document.querySelector(`.audio-jenis[data-jenis="${jenis}"]`);
+  const status = box.querySelector('.audio-status');
+  const player = box.querySelector('.audio-player');
+  const hapusBtn = box.querySelector('.audio-hapus-btn');
+  if (url) {
+    status.textContent = 'Sudah ada rekaman kustom aktif ✅';
+    player.innerHTML = `<audio controls src="${url}" style="width:100%; margin-top:4px; height:32px;"></audio>`;
+    hapusBtn.style.display = 'inline-block';
+  } else {
+    status.textContent = 'Belum ada rekaman kustom — pakai bunyi default';
+    player.innerHTML = '';
+    hapusBtn.style.display = 'none';
+  }
+}
+function fileKeBase64(fileAtauBlob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(fileAtauBlob);
+  });
+}
+async function uploadAudio(jenis, base64, mime) {
+  const r = await apiPost('/api/audio', { jenis, data: base64, mime });
+  if (r.ok) muatStatusAudioAdmin(); else alert(r.pesan);
+}
+muatStatusAudioAdmin();
+
+document.querySelectorAll('.audio-jenis').forEach((box) => {
+  const jenis = box.dataset.jenis;
+
+  box.querySelector('.audio-upload-btn').addEventListener('click', async () => {
+    const input = box.querySelector('.audio-file-input');
+    if (!input.files[0]) { alert('Pilih file audio dulu'); return; }
+    const file = input.files[0];
+    const base64 = await fileKeBase64(file);
+    await uploadAudio(jenis, base64, file.type || 'audio/mpeg');
+    input.value = '';
+  });
+
+  box.querySelector('.audio-hapus-btn').addEventListener('click', async () => {
+    if (!confirm('Kembalikan ke bunyi default (hapus rekaman kustom ini)?')) return;
+    const r = await apiPost('/api/audio/hapus', { jenis });
+    if (r.ok) muatStatusAudioAdmin(); else alert(r.pesan);
+  });
+
+  let mediaRecorder = null;
+  let potonganRekaman = [];
+  const recordBtn = box.querySelector('.audio-record-btn');
+  recordBtn.addEventListener('click', async () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      potonganRekaman = [];
+      mediaRecorder.ondataavailable = (e) => potonganRekaman.push(e.data);
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        recordBtn.textContent = '🎙️ Rekam Langsung';
+        recordBtn.disabled = false;
+        const blob = new Blob(potonganRekaman, { type: 'audio/webm' });
+        const base64 = await fileKeBase64(blob);
+        await uploadAudio(jenis, base64, 'audio/webm');
+      };
+      mediaRecorder.start();
+      recordBtn.textContent = '⏹️ Klik lagi untuk berhenti & simpan';
+    } catch (e) {
+      alert('Tidak bisa mengakses mikrofon. Izinkan akses mikrofon di browser dulu.');
+    }
+  });
+});
+
+async function muatStatusBgAdmin() {
+  const r = await fetch('/api/welcome-bg/status').then((x) => x.json());
+  if (!r.ok) return;
+  renderBgJenis('desktop', r.desktop);
+  renderBgJenis('mobile', r.mobile);
+}
+function renderBgJenis(jenis, url) {
+  const box = document.querySelector(`.bg-jenis[data-jenis="${jenis}"]`);
+  const status = box.querySelector('.bg-status');
+  const preview = box.querySelector('.bg-preview');
+  const hapusBtn = box.querySelector('.bg-hapus-btn');
+  if (url) {
+    status.textContent = 'Sudah ada gambar kustom aktif ✅';
+    preview.innerHTML = `<img src="${url}" style="width:100%; max-height:140px; object-fit:cover; border-radius:10px; margin-top:6px;">`;
+    hapusBtn.style.display = 'inline-block';
+  } else {
+    status.textContent = 'Belum ada gambar — pakai background gradient default';
+    preview.innerHTML = '';
+    hapusBtn.style.display = 'none';
+  }
+}
+function fileKeBase64Bg(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+muatStatusBgAdmin();
+
+document.querySelectorAll('.bg-jenis').forEach((box) => {
+  const jenis = box.dataset.jenis;
+
+  box.querySelector('.bg-upload-btn').addEventListener('click', async () => {
+    const input = box.querySelector('.bg-file-input');
+    if (!input.files[0]) { alert('Pilih gambar dulu'); return; }
+    const file = input.files[0];
+    const base64 = await fileKeBase64Bg(file);
+    const r = await apiPost('/api/welcome-bg', { jenis, data: base64, mime: file.type || 'image/jpeg' });
+    if (r.ok) { muatStatusBgAdmin(); input.value = ''; } else alert(r.pesan);
+  });
+
+  box.querySelector('.bg-hapus-btn').addEventListener('click', async () => {
+    if (!confirm('Kembalikan ke background default?')) return;
+    const r = await apiPost('/api/welcome-bg/hapus', { jenis });
+    if (r.ok) muatStatusBgAdmin(); else alert(r.pesan);
+  });
+});
+</script>
+</body>
+</html>
