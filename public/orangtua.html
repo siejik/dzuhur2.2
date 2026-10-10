@@ -19,6 +19,17 @@
   tr.klik:active td { box-shadow: var(--neu-inset-sm); }
   .kotak-info { text-align: center; padding: 18px 10px; color: var(--abu); font-size: 13px; }
   h2.nama-siswa { margin: 0; font-size: 18px; }
+  details.grup-jurusan { margin-bottom: 14px; background: var(--bg); border-radius: var(--radius); box-shadow: var(--neu-raised); overflow: hidden; }
+  details.grup-jurusan > summary { padding: 14px 16px; font-weight: 700; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; color: var(--hijau-tua); }
+  details.grup-jurusan > summary::-webkit-details-marker { display: none; }
+  details.grup-kelas { margin: 0 12px 10px; border-radius: var(--radius-kecil); overflow: hidden; box-shadow: var(--neu-inset-sm); }
+  details.grup-kelas > summary { padding: 9px 12px; font-size: 13px; font-weight: 600; cursor: pointer; list-style: none; display: flex; justify-content: space-between; }
+  details.grup-kelas > summary::-webkit-details-marker { display: none; }
+  .isi-kelas { padding: 4px 0 8px; }
+  .isi-kelas .bar-kelas { padding: 4px 12px 8px; }
+  .nama-btn { display: block; width: 100%; text-align: left; box-shadow: none; border-radius: 0; border-bottom: 1px solid var(--garis); font-weight: 600; font-size: 14px; color: var(--teks); padding: 10px 14px; }
+  .nama-btn:last-child { border-bottom: none; }
+  .nama-btn:active { box-shadow: var(--neu-inset-sm); }
   .daftar-nama { margin-top: 10px; max-height: 340px; overflow: auto; border-radius: var(--radius-kecil); box-shadow: var(--neu-inset-sm); }
   .daftar-nama button { display: block; width: 100%; text-align: left; box-shadow: none; border-radius: 0; border-bottom: 1px solid var(--garis); font-weight: 600; font-size: 14px; color: var(--teks); padding: 11px 14px; }
   .daftar-nama button:last-child { border-bottom: none; }
@@ -32,25 +43,17 @@
     <div class="badge">👨‍👩‍👧</div>
     <div>
       <h1>Riwayat Sholat Siswa</h1>
-      <div class="sub">Pilih kelas, lalu pilih nama siswa — bisa diunduh PDF / Excel</div>
+      <div class="sub">Buka jurusan → kelas → klik nama siswa — bisa diunduh PDF / Excel</div>
     </div>
   </header>
 
   <div class="card">
-    <label for="fKelas" style="margin-top:0;">Pilih Kelas</label>
-    <div class="manual"><select id="fKelas"><option value="">Memuat daftar kelas...</option></select><button id="btnKelas">Lihat Siswa</button></div>
-    <div id="pesanKelas" class="small-note"></div>
+    <input id="fCari" type="text" autocomplete="off" placeholder="Cari nama siswa (minimal 3 huruf)...">
+    <div id="hasilCari" class="daftar-nama" style="display:none;"></div>
+    <div class="small-note" id="infoJml">Memuat daftar kelas...</div>
   </div>
 
-  <div class="card" id="kartuDaftarSiswa" style="display:none;">
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-      <div style="font-weight:700;" id="judulDaftar">-</div>
-      <button class="secondary" id="btnRekapKelas" style="font-size:12px; padding:7px 11px;">📊 Rekap seluruh kelas (guru)</button>
-    </div>
-    <input id="fCariNama" type="text" autocomplete="off" placeholder="Cari nama siswa..." style="margin-top:10px;">
-    <div class="small-note">Klik nama siswa untuk melihat riwayat sholatnya.</div>
-    <div id="daftarSiswa" class="daftar-nama"></div>
-  </div>
+  <div id="daftarJurusan"></div>
 
   <div class="card" id="kartuLoginWalas" style="display:none;">
     <div style="font-weight:700;">🔒 Rekap seluruh kelas khusus guru</div>
@@ -154,62 +157,96 @@ function tampilkanSiswa(r) {
 }
 function gulirKe(id) { $(id).scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
-// ---------- pilih kelas -> pilih nama (publik, tanpa NISN) ----------
-let daftarNama = [];
+// ---------- jurusan -> kelas -> nama siswa (publik, tanpa NISN) ----------
 let kelasDipilih = '';
-async function muatKelas() {
-  try {
-    const r = await (await fetch('/api/publik/kelas')).json();
-    if (!r.ok || !r.data.length) { $('fKelas').innerHTML = '<option value="">(belum ada data kelas)</option>'; return; }
-    $('fKelas').innerHTML = r.data.map((k) => `<option value="${k}">${k}</option>`).join('');
-  } catch (e) { $('pesanKelas').textContent = '❌ Gagal terhubung ke server'; }
-}
-function renderDaftar() {
-  const cari = $('fCariNama').value.trim().toLowerCase();
-  const box = $('daftarSiswa');
-  box.innerHTML = '';
-  const tampil = daftarNama.filter((s) => !cari || s.nama.toLowerCase().includes(cari));
-  if (!tampil.length) { box.innerHTML = '<div class="kotak-info">Tidak ada nama yang cocok.</div>'; return; }
-  tampil.forEach((s) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = s.nama;
-    b.addEventListener('click', () => bukaSiswaPublik(s.sid));
-    box.appendChild(b);
-  });
-}
-async function bukaSiswaPublik(sid) {
+async function bukaSiswaPublik(kelas, sid) {
+  kelasDipilih = kelas;
   ulangDetail = async () => {
-    const r = await (await fetch(`/api/publik/riwayat?kelas=${encodeURIComponent(kelasDipilih)}&sid=${encodeURIComponent(sid)}&${qPeriode()}`)).json();
+    const r = await (await fetch(`/api/publik/riwayat?kelas=${encodeURIComponent(kelas)}&sid=${encodeURIComponent(sid)}&${qPeriode()}`)).json();
     if (!r.ok) { alert(r.pesan); return false; }
     tampilkanSiswa(r);
     return true;
   };
   if (await ulangDetail()) gulirKe('hasilSiswa');
 }
-async function lihatSiswaKelas() {
-  const kelas = $('fKelas').value;
-  if (!kelas) return;
-  $('pesanKelas').textContent = 'Memuat...';
+function tombolNama(nama, kelas, sid, tambahKelas) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'nama-btn';
+  b.textContent = tambahKelas ? `${nama} — ${kelas}` : nama;
+  b.addEventListener('click', () => bukaSiswaPublik(kelas, sid));
+  return b;
+}
+async function isiKelas(kelas, wadah) {
+  wadah.innerHTML = '<div class="kotak-info">Memuat...</div>';
   try {
     const r = await (await fetch(`/api/publik/siswa?kelas=${encodeURIComponent(kelas)}`)).json();
-    if (!r.ok) { $('pesanKelas').textContent = '❌ ' + r.pesan; return; }
-    $('pesanKelas').textContent = '';
-    kelasDipilih = kelas;
-    daftarNama = r.data;
-    $('judulDaftar').textContent = `Kelas ${kelas} · ${r.data.length} siswa`;
-    $('fCariNama').value = '';
-    $('kartuDaftarSiswa').style.display = 'block';
-    $('hasilSiswa').style.display = 'none';
-    $('hasilKelas').style.display = 'none';
-    $('kartuLoginWalas').style.display = 'none';
-    ulangDetail = null; ulangKelas = null;
-    renderDaftar();
-  } catch (e) { $('pesanKelas').textContent = '❌ Gagal terhubung ke server'; }
+    if (!r.ok) { wadah.innerHTML = `<div class="kotak-info">❌ ${r.pesan}</div>`; return false; }
+    wadah.innerHTML = '';
+    const bar = document.createElement('div');
+    bar.className = 'bar-kelas';
+    bar.innerHTML = '<button type="button" class="secondary" style="font-size:12px; padding:7px 11px;">📊 Rekap seluruh kelas (guru)</button>';
+    bar.querySelector('button').addEventListener('click', async () => {
+      kelasDipilih = kelas;
+      ulangKelas = tampilkanRekapKelas;
+      if (await tampilkanRekapKelas()) gulirKe('hasilKelas'); else gulirKe('kartuLoginWalas');
+    });
+    wadah.appendChild(bar);
+    r.data.forEach((s) => wadah.appendChild(tombolNama(s.nama, kelas, s.sid, false)));
+    return true;
+  } catch (e) { wadah.innerHTML = '<div class="kotak-info">❌ Gagal terhubung ke server</div>'; return false; }
 }
-$('btnKelas').addEventListener('click', lihatSiswaKelas);
-$('fKelas').addEventListener('change', () => { $('kartuDaftarSiswa').style.display = 'none'; $('hasilSiswa').style.display = 'none'; $('hasilKelas').style.display = 'none'; $('kartuLoginWalas').style.display = 'none'; });
-$('fCariNama').addEventListener('input', renderDaftar);
+async function muatStruktur() {
+  try {
+    const r = await (await fetch('/api/publik/kelas')).json();
+    if (!r.ok || !r.data.length) { $('infoJml').textContent = 'Belum ada data kelas.'; return; }
+    const perJurusan = {};
+    let total = 0;
+    r.data.forEach((k) => { (perJurusan[k.jurusan] = perJurusan[k.jurusan] || []).push(k); total += k.jumlah; });
+    $('infoJml').textContent = `${total} siswa di ${r.data.length} kelas`;
+    const wadah = $('daftarJurusan');
+    wadah.innerHTML = '';
+    const namaJurusan = Object.keys(perJurusan).sort();
+    namaJurusan.forEach((jur) => {
+      const kelasList = perJurusan[jur].sort((a, b) => a.kelas.localeCompare(b.kelas));
+      const jml = kelasList.reduce((n, k) => n + k.jumlah, 0);
+      const dj = document.createElement('details');
+      dj.className = 'grup-jurusan';
+      dj.open = namaJurusan.length <= 3;
+      dj.innerHTML = `<summary><span>📚 ${jur}</span><span class="small-note" style="margin:0;">${jml} siswa</span></summary>`;
+      kelasList.forEach((k) => {
+        const dk = document.createElement('details');
+        dk.className = 'grup-kelas';
+        dk.innerHTML = `<summary><span>${k.kelas}</span><span>${k.jumlah} siswa</span></summary>`;
+        const isi = document.createElement('div');
+        isi.className = 'isi-kelas';
+        dk.appendChild(isi);
+        let termuat = false;
+        dk.addEventListener('toggle', () => { if (dk.open && !termuat) { termuat = true; isiKelas(k.kelas, isi).then((ok) => { if (!ok) termuat = false; }); } });
+        dj.appendChild(dk);
+      });
+      wadah.appendChild(dj);
+    });
+  } catch (e) { $('infoJml').textContent = '❌ Gagal terhubung ke server'; }
+}
+
+// pencarian nama (opsional, supaya tidak perlu membuka satu-satu)
+let timerCari = null;
+$('fCari').addEventListener('input', () => {
+  clearTimeout(timerCari);
+  const q = $('fCari').value.trim();
+  const box = $('hasilCari');
+  if (q.length < 3) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  timerCari = setTimeout(async () => {
+    try {
+      const r = await (await fetch(`/api/publik/cari?q=${encodeURIComponent(q)}`)).json();
+      box.style.display = 'block';
+      box.innerHTML = '';
+      if (!r.ok || !r.data.length) { box.innerHTML = '<div class="kotak-info">Tidak ada nama yang cocok.</div>'; return; }
+      r.data.forEach((s) => box.appendChild(tombolNama(s.nama, s.kelas, s.sid, true)));
+    } catch (e) { box.style.display = 'block'; box.innerHTML = '<div class="kotak-info">❌ Gagal terhubung ke server</div>'; }
+  }, 400);
+});
 
 // ---------- rekap seluruh kelas (khusus guru, butuh login) ----------
 $('btnLoginWalas').addEventListener('click', () => { window.location.href = '/login?next=/orangtua'; });
@@ -243,11 +280,6 @@ async function tampilkanRekapKelas() {
   });
   return true;
 }
-$('btnRekapKelas').addEventListener('click', async () => {
-  ulangKelas = tampilkanRekapKelas;
-  if (await tampilkanRekapKelas()) gulirKe('hasilKelas'); else gulirKe('kartuLoginWalas');
-});
-
 // periode diganti -> data yang sedang terbuka ikut diperbarui
 function periodeBerubah() {
   if (ulangDetail && $('hasilSiswa').style.display !== 'none') ulangDetail();
@@ -257,7 +289,7 @@ $('fDari').addEventListener('change', periodeBerubah);
 $('fSampai').addEventListener('change', periodeBerubah);
 document.querySelectorAll('.cepat button').forEach((b) => b.addEventListener('click', periodeBerubah));
 
-muatKelas();
+muatStruktur();
 
 // ---------- export ----------
 const aman = (t) => String(t).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
