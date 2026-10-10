@@ -644,7 +644,12 @@ async function riwayatSiswa(siswa, dari, sampai) {
   return { siswa: { nama: siswa.nama, kelas: siswa.kelas }, non_muslim: false, dari, sampai, hari, ringkas: ringkasRiwayat(sholat, izin, belum), hariAktif: tanggal.filter((t) => aktif.has(t)).length };
 }
 
-// Pembatas request untuk endpoint publik (cegah orang menebak NISN satu per satu): 40 permintaan / 10 menit / IP
+// Halaman publik memakai token buram (bukan NISN) untuk menunjuk siswa. Kunci acak dibuat tiap server start,
+// jadi token tidak bisa ditebak dan tidak bisa dipakai untuk menurunkan NISN.
+const KUNCI_TOKEN_PUBLIK = crypto.randomBytes(32);
+function tokenPublik(kts_id) { return crypto.createHmac('sha256', KUNCI_TOKEN_PUBLIK).update(String(kts_id)).digest('hex').slice(0, 20); }
+
+// Pembatas request untuk endpoint publik (cegah pengambilan data massal): 120 permintaan / 10 menit / IP
 const batasPublik = new Map();
 function lolosBatasPublik(req) {
   const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?';
@@ -653,7 +658,7 @@ function lolosBatasPublik(req) {
   let e = batasPublik.get(ip);
   if (!e || now > e.reset) { e = { n: 0, reset: now + 10 * 60 * 1000 }; batasPublik.set(ip, e); }
   e.n++;
-  return e.n <= 40;
+  return e.n <= 120;
 }
 
 // ================= LOGIKA HAID =================
@@ -1018,15 +1023,25 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { ok: true, siswa, waktu, keterangan: teks, hari_ke: hariKe, mulai, pesan: `Token izin diberikan (${teks})` });
     }
 
-    // ---- API publik: riwayat sholat 1 siswa lewat NISN (Orang Tua / Murid) ----
-    if (req.method === 'GET' && p === '/api/publik/riwayat') {
-      if (!lolosBatasPublik(req)) return sendJSON(res, 429, { ok: false, pesan: 'Terlalu banyak pencarian. Coba lagi beberapa menit lagi.' });
-      const nisn = String(url.searchParams.get('nisn') || '').trim();
-      if (!nisn) return sendJSON(res, 400, { ok: false, pesan: 'Isi NISN dulu' });
-      const siswa = await stmt.getSiswa(nisn);
-      if (!siswa) return sendJSON(res, 200, { ok: false, code: 'not_found', pesan: 'NISN tidak ditemukan. Periksa lagi nomornya.' });
-      const { dari, sampai } = bacaRentang(url);
-      return sendJSON(res, 200, { ok: true, ...(await riwayatSiswa(siswa, dari, sampai)) });
+    // ---- API publik (Orang Tua / Murid): pilih kelas -> pilih nama -> riwayat. Tanpa NISN. ----
+    if (req.method === 'GET' && p.startsWith('/api/publik/')) {
+      if (!lolosBatasPublik(req)) return sendJSON(res, 429, { ok: false, pesan: 'Terlalu banyak permintaan. Coba lagi beberapa menit lagi.' });
+      if (p === '/api/publik/kelas') {
+        return sendJSON(res, 200, { ok: true, data: (await stmt.daftarKelas()).map((r) => r.kelas) });
+      }
+      const kelas = String(url.searchParams.get('kelas') || '').trim();
+      if (p === '/api/publik/siswa') {
+        if (!kelas) return sendJSON(res, 400, { ok: false, pesan: 'Pilih kelas dulu' });
+        // hanya nama + token buram; NISN & data lain tidak ikut dikirim
+        return sendJSON(res, 200, { ok: true, kelas, data: (await stmt.siswaPerKelas(kelas)).map((sw) => ({ sid: tokenPublik(sw.kts_id), nama: sw.nama })) });
+      }
+      if (p === '/api/publik/riwayat') {
+        const sid = String(url.searchParams.get('sid') || '').trim();
+        const siswa = kelas && sid ? (await stmt.siswaPerKelas(kelas)).find((sw) => tokenPublik(sw.kts_id) === sid) : null;
+        if (!siswa) return sendJSON(res, 200, { ok: false, code: 'not_found', pesan: 'Siswa tidak ditemukan. Muat ulang halaman lalu pilih lagi.' });
+        const { dari, sampai } = bacaRentang(url);
+        return sendJSON(res, 200, { ok: true, ...(await riwayatSiswa(siswa, dari, sampai)) });
+      }
     }
 
     // ---- API Wali Kelas (butuh login guru/admin): rekap 1 kelas & detail 1 siswa ----

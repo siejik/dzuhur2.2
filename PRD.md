@@ -89,16 +89,18 @@ akunnya sendiri yang sedang login.
   - Rekap harian & rekap mingguan/bulanan menampilkan **"Haid"** (simbol `H`, kolom Haid sendiri) — keputusan pemilik:
     tidak ada pembatasan privasi di rekap internal.
   - Mengganti NISN memindahkan episode; menghapus siswa ikut menghapus catatan haidnya.
-- **Halaman Orang Tua / Wali Kelas** (`/orangtua`, tombol di halaman depan):
-  - *Orang Tua / Murid* (publik): masukkan **NISN** → riwayat sholat anak per tanggal untuk periode pilihan
-    (dari–sampai, atau Bulan ini / Bulan lalu / 3 bulan terakhir): Sholat, Izin, Belum, **Kehadiran %**
-    (= Sholat ÷ (Sholat + Belum); izin tidak dihitung; Minggu libur; hari tanpa data sama sekali tidak dihitung).
-    Export **PDF & Excel** (cocok untuk laporan / nilai rapor). Siswa non-muslim ditandai tanpa hitungan.
-  - *Wali Kelas*: pilih kelas → tabel rekap semua siswa kelas itu (klik nama = rincian per tanggal) + Export PDF & Excel.
-    **Wajib login guru/admin** (diarahkan ke `/login?next=/orangtua`, kembali otomatis setelah login).
-  - **Privasi (keputusan desain):** halaman ini hanya menampilkan **"Izin" tanpa alasan** — kata "haid"/keterangan
-    tidak pernah dikirim ke halaman ini, karena dilihat orang tua & dipakai untuk rapor. Pencarian publik dibatasi
-    **40 permintaan / 10 menit / IP** (HTTP 429) agar NISN tidak bisa ditebak beruntun.
+- **Halaman Orang Tua / Wali Kelas** (`/orangtua`, tombol di halaman depan) — **tanpa NISN**:
+  - Alur publik: **pilih kelas → daftar nama siswa (ada kotak cari) → klik nama → riwayat sholat anak** untuk periode pilihan
+    (dari–sampai, atau Bulan ini / Bulan lalu / 3 bulan terakhir; mengganti periode memperbarui tampilan otomatis):
+    Sholat, Izin, Belum, **Kehadiran %** (= Sholat ÷ (Sholat + Belum); izin tidak dihitung; Minggu libur; hari tanpa data
+    sama sekali tidak dihitung) + rincian per tanggal + Export **PDF & Excel** (untuk laporan / nilai rapor).
+    Siswa non-muslim ditandai tanpa hitungan.
+  - **Rekap seluruh kelas** (tabel perbandingan semua siswa + export PDF/Excel) tetap **khusus guru**: tombol
+    "Rekap seluruh kelas (guru)" meminta login (`/login?next=/orangtua`, kembali otomatis setelah login).
+  - **Privasi (keputusan desain):** (1) respons publik hanya berisi **nama + token buram** (`sid`, HMAC acak yang berganti tiap
+    server restart) — **NISN dan jenis kelamin tidak pernah dikirim** ke halaman publik; (2) hanya status **"Izin" tanpa
+    alasan** (kata "haid"/keterangan tidak pernah dikirim); (3) pembatas **120 permintaan / 10 menit / IP** (HTTP 429).
+    Konsekuensi yang disadari pemilik: karena tanpa NISN, **siapa pun yang tahu nama siswa bisa melihat riwayat sholatnya**.
 - **Halaman depan** (`welcome.html`): teks "Tentang sistem ini", dan 2 tombol — 🔐 Masuk Guru / Admin dan
   👨‍👩‍👧 Orang Tua / Wali Kelas — posisinya dinaikkan ke antara tengah dan bawah layar.
 - Audio notifikasi kustom (upload/rekam, terpisah untuk "Berhasil"/"Gagal")
@@ -126,7 +128,8 @@ POST /api/token-khusus             (mode Scan Khusus — role guru/admin)
 GET  /api/jadwal-saya
 
 -- publik --
-GET  /api/publik/riwayat?nisn=&dari=&sampai=     (rate-limited 40/10 menit/IP; hanya "izin", tanpa alasan)
+GET  /api/publik/kelas   GET /api/publik/siswa?kelas=   GET /api/publik/riwayat?kelas=&sid=&dari=&sampai=
+                                   (rate-limited 120/10 menit/IP; hanya nama+sid; status "izin" tanpa alasan; tanpa NISN)
 -- login guru/admin --
 GET  /api/haid/info?kts_id=                      (boleh_haid, episode berjalan, hari ke-N)
 GET  /api/walas/kelas   GET /api/walas/rekap?kelas=&dari=&sampai=   GET /api/walas/siswa?kts_id=&dari=&sampai=
@@ -155,7 +158,7 @@ GET  /api/welcome-bg/status        POST /api/welcome-bg       POST /api/welcome-
 | `/admin` | admin | dashboard: rekap + link ke halaman lain |
 | `/siswa` | admin | kelola data siswa (grup jurusan/kelas, edit, hapus massal) |
 | `/akun-guru` | admin | kelola akun guru & admin |
-| `/orangtua` | publik (tab Wali Kelas butuh login guru) | riwayat sholat siswa per NISN / rekap per kelas, export PDF/Excel |
+| `/orangtua` | publik (rekap seluruh kelas butuh login guru) | pilih kelas → nama → riwayat sholat anak; rekap kelas (guru); export PDF/Excel |
 | `/cetak-kartu` | admin | kartu sementara |
 | `/riwayat` | admin | riwayat 6 bulan |
 | `/rekap` | admin | rekap harian/mingguan/bulanan, export PDF/Excel (`/rekap-mingguan` lama redirect ke sini) |
@@ -193,7 +196,7 @@ saling menendang), atau pesan "Bukan Jadwal Piket" yang terkesan seperti gagal l
 
 ## 9. Testing yang Sudah Dilakukan
 
-**Fitur haid + halaman orang tua/wali kelas:** 39 pengecekan otomatis terhadap MariaDB asli dari database kosong, semuanya
+**Fitur haid + halaman orang tua/wali kelas:** 43 pengecekan otomatis terhadap MariaDB asli dari database kosong, semuanya
 lolos (aturan gender, batas hari ke-7/ke-8, keputusan lanjut/tidak + catatan, koreksi H1, tanggal masa depan, penutupan
 episode saat sholat normal, siklus 2 episode, ganti NISN, hapus siswa, set massal gender, privasi halaman publik, akses
 wali kelas, rate limit). Regresi: login, hapus akun + logout paksa, rekap.
@@ -207,7 +210,8 @@ sungguhan (cuma dicek secara kode/CSS, bukan screenshot), dan belum diuji di hos
 yang sebenarnya.
 
 **Keterbatasan yang sengaja dibiarkan (bisa jadi pekerjaan berikutnya):**
-- Tab Wali Kelas belum terikat ke kelas tertentu: **semua akun guru bisa melihat semua kelas**. Pembatasan "guru hanya
+- Halaman publik tidak memakai PIN/kode: kalau nanti dirasa terlalu terbuka, opsi penguatan = kode akses per kelas atau tanggal lahir anak.
+- Rekap kelas belum terikat ke kelas tertentu: **semua akun guru bisa melihat semua kelas**. Pembatasan "guru hanya
   kelas binaannya" butuh data wali kelas per akun.
 - Batas hari haid (`BATAS_HAID_HARI`) berupa konstanta di kode, belum bisa diubah dari halaman admin.
 - Haid hanya tercatat saat siswi discan di Scan Khusus; hari ke-N dihitung dari tanggal, bukan dari kehadiran. Jika siswi
