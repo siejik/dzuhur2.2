@@ -190,6 +190,8 @@ const stmt = {
   absensiKelasRange: (kelas, dari, sampai) => db.all(
     `SELECT a.kts_id, a.tanggal, a.status FROM absensi a JOIN siswa s ON s.kts_id = a.kts_id
      WHERE s.kelas = ? AND a.tanggal BETWEEN ? AND ?`, [kelas, dari, sampai]),
+  ringkasKelas: () => db.all(`SELECT kelas, COUNT(*) AS jumlah FROM siswa WHERE kelas IS NOT NULL AND kelas <> '' GROUP BY kelas ORDER BY kelas`),
+  cariNamaSiswa: (q) => db.all(`SELECT kts_id, nama, kelas FROM siswa WHERE nama LIKE ? ORDER BY nama LIMIT 15`, ['%' + q.replace(/[\\%_]/g, '\\$&') + '%']),
   daftarKelas: () => db.all(`SELECT DISTINCT kelas FROM siswa WHERE kelas IS NOT NULL AND kelas <> '' ORDER BY kelas`),
   // ---- siklus haid ----
   getEpisodeAktif: (kts_id) => db.get(`SELECT * FROM siklus_haid WHERE kts_id = ? AND status = 'berjalan' ORDER BY id DESC LIMIT 1`, [kts_id]),
@@ -1027,7 +1029,13 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p.startsWith('/api/publik/')) {
       if (!lolosBatasPublik(req)) return sendJSON(res, 429, { ok: false, pesan: 'Terlalu banyak permintaan. Coba lagi beberapa menit lagi.' });
       if (p === '/api/publik/kelas') {
-        return sendJSON(res, 200, { ok: true, data: (await stmt.daftarKelas()).map((r) => r.kelas) });
+        // untuk akordeon Jurusan -> Kelas: nama kelas, jurusan, dan jumlah siswa (tanpa nama siswa)
+        return sendJSON(res, 200, { ok: true, data: (await stmt.ringkasKelas()).map((r) => ({ kelas: r.kelas, jurusan: ekstrakJurusan(r.kelas), jumlah: Number(r.jumlah) })) });
+      }
+      if (p === '/api/publik/cari') {
+        const q = String(url.searchParams.get('q') || '').trim();
+        if (q.length < 3) return sendJSON(res, 200, { ok: true, data: [], pesan: 'Ketik minimal 3 huruf' });
+        return sendJSON(res, 200, { ok: true, data: (await stmt.cariNamaSiswa(q)).map((sw) => ({ sid: tokenPublik(sw.kts_id), nama: sw.nama, kelas: sw.kelas })) });
       }
       const kelas = String(url.searchParams.get('kelas') || '').trim();
       if (p === '/api/publik/siswa') {
